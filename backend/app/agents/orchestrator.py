@@ -40,49 +40,72 @@ def orchestrator_router(state: AgentState) -> str:
     
     return routes.get(intent, END)
 
-# Placeholder Agent Nodes
+from app.agents.repo_agent import analyze_repository
+from app.agents.issue_agent import explain_issue
+from app.agents.code_agent import trace_code
+from app.agents.fix_agent import generate_fix
+from app.agents.review_agent import review_pr
+from app.agents.triage_agent import triage_issue
+from app.agents.duplicate_agent import detect_duplicate
+from app.agents.label_agent import label_issue
+from app.agents.match_agent import match_contributor
+from app.agents.health_agent import project_health
+
 def repo_agent_node(state: AgentState) -> AgentState:
-    print(f"Running Repo Agent for {state['payload'].get('repo_url')}")
-    state["repo_summary"] = {"status": "analyzed"}
+    repo_url = state["payload"].get("repo_url")
+    state["repo_summary"] = analyze_repository(repo_url)
     return state
 
 def issue_agent_node(state: AgentState) -> AgentState:
-    print(f"Running Issue Agent for {state['payload'].get('issue_url')}")
-    state["issue_summary"] = {"status": "explained"}
+    issue_url = state["payload"].get("issue_url")
+    state["issue_summary"] = explain_issue(issue_url)
     return state
 
 def code_agent_node(state: AgentState) -> AgentState:
-    print(f"Running Code Agent")
-    state["affected_files"] = []
+    repo_url = state["payload"].get("repo_url")
+    issue_summary = state.get("issue_summary", {})
+    code_result = trace_code(repo_url, issue_summary)
+    state["affected_files"] = code_result.get("affected_files", [])
+    state["call_graph"] = code_result.get("call_graph", {})
     return state
 
 def fix_agent_node(state: AgentState) -> AgentState:
-    print(f"Running Fix Agent")
-    state["fix_plan"] = {"status": "generated"}
+    issue_summary = state.get("issue_summary", {})
+    affected_files = state.get("affected_files", [])
+    call_graph = state.get("call_graph", {})
+    state["fix_plan"] = generate_fix(issue_summary, affected_files, call_graph)
     return state
 
 def review_agent_node(state: AgentState) -> AgentState:
-    state["pr_review"] = {"status": "reviewed"}
+    pr_url = state["payload"].get("pr_url")
+    state["pr_review"] = review_pr(pr_url)
     return state
 
 def triage_agent_node(state: AgentState) -> AgentState:
-    state["triage_result"] = {"status": "triaged"}
+    issue_url = state["payload"].get("issue_url")
+    state["triage_result"] = triage_issue(issue_url)
     return state
 
 def duplicate_agent_node(state: AgentState) -> AgentState:
-    state["duplicate_result"] = {"status": "checked"}
+    issue_url = state["payload"].get("issue_url")
+    repo_url = state["payload"].get("repo_url")
+    state["duplicate_result"] = detect_duplicate(issue_url, repo_url)
     return state
 
 def label_agent_node(state: AgentState) -> AgentState:
-    state["label_result"] = {"status": "labeled"}
+    repo_url = state["payload"].get("repo_url")
+    issue_summary = state.get("issue_summary", {})
+    state["label_result"] = label_issue(repo_url, issue_summary)
     return state
 
 def match_agent_node(state: AgentState) -> AgentState:
-    state["match_result"] = {"status": "matched"}
+    issue_url = state["payload"].get("issue_url")
+    state["match_result"] = match_contributor(issue_url)
     return state
 
 def health_agent_node(state: AgentState) -> AgentState:
-    state["health_report"] = {"status": "generated"}
+    repo_url = state["payload"].get("repo_url")
+    state["health_report"] = project_health(repo_url)
     return state
 
 # Intermediate routing for complex flows

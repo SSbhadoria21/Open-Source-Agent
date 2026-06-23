@@ -3,25 +3,47 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0A0A0F;
+  --foreground: #EAEAF5;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(110, 86, 207, 0.05), transparent 40%),
+    radial-gradient(circle at 85% 30%, rgba(0, 212, 255, 0.05), transparent 40%);
+  background-attachment: fixed;
+  position: relative;
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 1px,
+    rgba(255, 255, 255, 0.03) 1px,
+    rgba(255, 255, 255, 0.03) 2px
+  );
+  pointer-events: none;
+  z-index: 9999;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .glass-card {
+    @apply bg-surface/80 backdrop-blur-md border border-border-color shadow-sm transition-all duration-300 rounded-xl p-6;
+  }
+  .glass-card:hover {
+    @apply -translate-y-1 shadow-glow;
   }
 }

@@ -1,13 +1,13 @@
 from typing import List, Union
-from pydantic import AnyHttpUrl, validator
-from pydantic_settings import BaseSettings
+from pydantic import AnyHttpUrl, field_validator, ValidationInfo
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Open Source Mentee Agent"
     API_V1_STR: str = "/api/v1"
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+    BACKEND_CORS_ORIGINS: List[str] = []
 
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
@@ -16,17 +16,7 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     # Database
-    POSTGRES_SERVER: str = "localhost"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_DB: str = "osmentee"
-    SQLALCHEMY_DATABASE_URI: str = ""
-
-    @validator("SQLALCHEMY_DATABASE_URI", pre=True)
-    def assemble_db_connection(cls, v: str, values: dict) -> str:
-        if isinstance(v, str) and v != "":
-            return v
-        return f"postgresql://{values.get('POSTGRES_USER')}:{values.get('POSTGRES_PASSWORD')}@{values.get('POSTGRES_SERVER')}/{values.get('POSTGRES_DB')}"
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/mentee_agent_db"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -35,8 +25,10 @@ class Settings(BaseSettings):
     GITHUB_TOKEN: str = ""
     GEMINI_API_KEY: str = ""
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        extra="ignore"
+    )
 
 settings = Settings()
