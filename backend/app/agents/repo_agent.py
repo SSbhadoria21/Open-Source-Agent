@@ -22,7 +22,8 @@ def analyze_repository(repo_url: str) -> Dict[str, Any]:
             "{{\n"
             '  "tech_stack": {{"frontend": "...", "backend": "...", "database": "..."}},\n'
             '  "key_directories": [{{"path": "...", "description": "..."}}],\n'
-            '  "entry_points": ["..."]\n'
+            '  "entry_points": ["..."],\n'
+            '  "summary": "a brief narrative summary of the codebase architecture, purpose, and tech stack"\n'
             "}}\n"
             "Return ONLY valid JSON without any markdown formatting."
         )

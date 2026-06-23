@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Clock, ArrowRight } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -123,10 +124,12 @@ export default function IssueFeed() {
                 ))}
               </div>
 
-              <button className="w-full py-2.5 rounded-lg border border-border-color text-text-primary font-medium text-sm transition-all group-hover:bg-primary group-hover:border-primary group-hover:text-white group-hover:shadow-glow flex items-center justify-center">
-                Analyze This Issue
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </button>
+              <Link href={`/contributor/issue-helper?repo=https://github.com/${issue.repo}&issue=https://github.com/${issue.repo}/issues/${issue.id === 2 ? 28924 : 100 + issue.id}`} className="w-full">
+                <button className="w-full py-2.5 rounded-lg border border-border-color text-text-primary font-medium text-sm transition-all group-hover:bg-primary group-hover:border-primary group-hover:text-white group-hover:shadow-glow flex items-center justify-center">
+                  Analyze This Issue
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </button>
+              </Link>
             </GlassCard>
           </motion.div>
         ))}

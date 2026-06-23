@@ -2,83 +2,56 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Bug, Shield, Paintbrush, TestTube, CheckCircle2, ArrowRight } from "lucide-react";
+import { Search, Bug, Shield, Paintbrush, TestTube, CheckCircle2, Loader2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
+import { StreamingText } from "@/components/ui/StreamingText";
+import { reviewPR, type ReviewPRResponse, type ReviewIssue } from "@/lib/api";
 
 export default function PRReview() {
+  const [prUrl, setPrUrl] = useState("https://github.com/facebook/react/pull/28925");
   const [analyzing, setAnalyzing] = useState(false);
   const [complete, setComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("Bugs");
+  const [data, setData] = useState<ReviewPRResponse | null>(null);
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
     setAnalyzing(true);
-    setTimeout(() => {
-      setAnalyzing(false);
+    setComplete(false);
+    setError(null);
+    setData(null);
+
+    try {
+      const result = await reviewPR(prUrl);
+      setData(result);
       setComplete(true);
-    }, 3000);
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
-  const tabs = [
-    { name: "Bugs", icon: <Bug className="w-4 h-4" />, count: 2, color: "text-critical" },
-    { name: "Security", icon: <Shield className="w-4 h-4" />, count: 0, color: "text-success" },
-    { name: "Style", icon: <Paintbrush className="w-4 h-4" />, count: 3, color: "text-warning" },
-    { name: "Tests", icon: <TestTube className="w-4 h-4" />, count: 1, color: "text-orange-500" },
+  const tabConfig = [
+    { name: "Bugs", icon: <Bug className="w-4 h-4" />, color: "text-critical" },
+    { name: "Security", icon: <Shield className="w-4 h-4" />, color: "text-success" },
+    { name: "Style", icon: <Paintbrush className="w-4 h-4" />, color: "text-warning" },
+    { name: "Tests", icon: <TestTube className="w-4 h-4" />, color: "text-orange-500" },
   ];
 
-  const issues = {
-    Bugs: [
-      {
-        id: 1,
-        severity: "High",
-        file: "src/utils/parser.ts:42",
-        desc: "Potential null pointer exception when `ast.body` is undefined before mapping.",
-        fix: "if (!ast?.body) return [];"
-      },
-      {
-        id: 2,
-        severity: "Medium",
-        file: "src/components/Header.tsx:18",
-        desc: "Missing dependency `user` in useEffect hook.",
-        fix: "}, [user, dispatch]);"
-      }
-    ],
-    Security: [],
-    Style: [
-      {
-        id: 3,
-        severity: "Low",
-        file: "src/api/client.ts:112",
-        desc: "Use camelCase for variable names instead of snake_case (`api_response`).",
-        fix: "const apiResponse = await fetch(...)"
-      },
-      {
-        id: 4,
-        severity: "Low",
-        file: "src/api/client.ts:115",
-        desc: "Unnecessary else block after return statement.",
-        fix: "Remove `else` and un-indent the block."
-      },
-      {
-        id: 5,
-        severity: "Low",
-        file: "src/models/user.ts:5",
-        desc: "Prefer `interface` over `type` for object definitions.",
-        fix: "interface UserProps { ... }"
-      }
-    ],
-    Tests: [
-      {
-        id: 6,
-        severity: "Medium",
-        file: "tests/parser.test.ts",
-        desc: "Missing test coverage for the new `parseStrict` function.",
-        fix: "Add a test block: `describe('parseStrict', () => { ... })`"
-      }
-    ]
+  const getIssueCount = (category: string): number => {
+    if (!data?.grouped_issues) return 0;
+    return (data.grouped_issues as any)[category]?.length || 0;
   };
 
-  const activeIssues = (issues as any)[activeTab];
+  const getActiveIssues = (): ReviewIssue[] => {
+    if (!data?.grouped_issues) return [];
+    return (data.grouped_issues as any)[activeTab] || [];
+  };
+
+  const tabs = tabConfig.map(t => ({ ...t, count: getIssueCount(t.name) }));
+  const activeIssues = getActiveIssues();
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -93,15 +66,16 @@ export default function PRReview() {
             type="text"
             className="flex-1 px-4 py-3 border border-border-color rounded-lg bg-background text-text-primary focus:outline-none focus:border-primary transition-all"
             placeholder="https://github.com/owner/repo/pull/123"
-            defaultValue="https://github.com/facebook/react/pull/28925"
+            value={prUrl}
+            onChange={(e) => setPrUrl(e.target.value)}
           />
-          <button 
+          <button
             onClick={startAnalysis}
             disabled={analyzing}
             className="flex items-center justify-center px-8 py-3 bg-primary text-white font-medium rounded-lg hover:shadow-glow disabled:opacity-50"
           >
             {analyzing ? (
-              <span className="flex items-center"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div> Analyzing...</span>
+              <span className="flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</span>
             ) : "Review PR"}
           </button>
         </div>
@@ -111,12 +85,28 @@ export default function PRReview() {
         </p>
       </GlassCard>
 
+      {error && (
+        <div className="mb-8 p-4 bg-critical/10 border border-critical/30 rounded-lg text-critical text-sm">
+          <span className="font-bold">Review Failed: </span>{error}
+        </div>
+      )}
+
       <AnimatePresence>
-        {complete && (
+        {complete && data && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
+            {/* Summary */}
+            {data.summary && (
+              <GlassCard className="mb-8" glowColor="secondary">
+                <h3 className="text-lg font-heading font-bold mb-3 text-secondary">AI Summary</h3>
+                <div className="text-sm text-text-primary leading-relaxed">
+                  <StreamingText text={data.summary} speed={15} />
+                </div>
+              </GlassCard>
+            )}
+
             {/* Summary Bar */}
             <div className="flex flex-wrap gap-4 mb-8">
               {tabs.map((tab) => (
@@ -140,8 +130,8 @@ export default function PRReview() {
                     key={tab.name}
                     onClick={() => setActiveTab(tab.name)}
                     className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium transition-all border-b-2 ${
-                      activeTab === tab.name 
-                        ? "border-primary text-text-primary bg-surface" 
+                      activeTab === tab.name
+                        ? "border-primary text-text-primary bg-surface"
                         : "border-transparent text-text-secondary hover:text-text-primary hover:bg-surface-raised"
                     }`}
                   >
@@ -169,9 +159,9 @@ export default function PRReview() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {activeIssues.map((issue: any, i: number) => (
+                    {activeIssues.map((issue, i) => (
                       <motion.div
-                        key={issue.id}
+                        key={`${issue.file}-${i}`}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.1 }}
@@ -184,15 +174,17 @@ export default function PRReview() {
                           </div>
                         </div>
                         <p className="text-text-primary mb-4 text-sm">{issue.desc}</p>
-                        
-                        <div className="bg-[#1E1E1E] rounded-md overflow-hidden border border-border-color">
-                          <div className="flex items-center px-4 py-1.5 bg-black/40 border-b border-border-color/50 text-xs text-text-secondary">
-                            Suggested Fix
+
+                        {issue.fix && (
+                          <div className="bg-[#1E1E1E] rounded-md overflow-hidden border border-border-color">
+                            <div className="flex items-center px-4 py-1.5 bg-black/40 border-b border-border-color/50 text-xs text-text-secondary">
+                              Suggested Fix
+                            </div>
+                            <pre className="p-3 text-xs font-mono text-[#D4D4D4] overflow-x-auto whitespace-pre-wrap">
+                              <span className="text-success">+ {issue.fix}</span>
+                            </pre>
                           </div>
-                          <pre className="p-3 text-xs font-mono text-[#D4D4D4] overflow-x-auto">
-                            <span className="text-success">+ {issue.fix}</span>
-                          </pre>
-                        </div>
+                        )}
                       </motion.div>
                     ))}
                   </div>

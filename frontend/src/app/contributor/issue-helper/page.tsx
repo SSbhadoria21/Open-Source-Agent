@@ -1,63 +1,96 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { GitBranch, FileText, Settings, Play, Copy, AlertTriangle, ArrowRight } from "lucide-react";
+import { GitBranch, FileText, Settings, Play, Copy, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AgentPipelineVisualizer, PipelineNode } from "@/components/ui/AgentPipelineVisualizer";
 import { StreamingText } from "@/components/ui/StreamingText";
 import { DifficultyBadge } from "@/components/ui/DifficultyBadge";
 import { FilePathChip } from "@/components/ui/FilePathChip";
+import { getFixPlan, type FixPlanResponse } from "@/lib/api";
 
 export default function IssueHelper() {
+  const searchParams = useSearchParams();
+
+  const [repoUrl, setRepoUrl] = useState(searchParams.get("repo") || "https://github.com/facebook/react");
+  const [issueUrl, setIssueUrl] = useState(searchParams.get("issue") || "https://github.com/facebook/react/issues/28924");
+
   const [nodes, setNodes] = useState<PipelineNode[]>([
     { id: "issue", name: "Issue Agent", icon: <FileText className="w-5 h-5" />, status: "idle" },
     { id: "code", name: "Code Agent", icon: <Settings className="w-5 h-5" />, status: "idle" },
     { id: "fix", name: "Fix Agent", icon: <Play className="w-5 h-5" />, status: "idle" },
   ]);
 
-  const [activePanel, setActivePanel] = useState<number>(0); // 0 = none, 1 = issue, 2 = code, 3 = fix
+  const [activePanel, setActivePanel] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<FixPlanResponse | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const runAnalysis = () => {
-    // Reset
-    setNodes(nodes.map(n => ({ ...n, status: "idle", time: undefined })));
+  const runAnalysis = async () => {
+    setLoading(true);
+    setError(null);
+    setData(null);
     setActivePanel(0);
 
-    // Simulate Agent 1
-    setTimeout(() => {
-      setNodes(n => [
-        { ...n[0], status: "running" },
-        n[1], n[2]
-      ]);
-    }, 500);
+    // Start pipeline visualization — Issue Agent running
+    setNodes([
+      { id: "issue", name: "Issue Agent", icon: <FileText className="w-5 h-5" />, status: "running" },
+      { id: "code", name: "Code Agent", icon: <Settings className="w-5 h-5" />, status: "idle" },
+      { id: "fix", name: "Fix Agent", icon: <Play className="w-5 h-5" />, status: "idle" },
+    ]);
 
-    setTimeout(() => {
-      setNodes(n => [
-        { ...n[0], status: "done", time: "2.4s" },
-        { ...n[1], status: "running" },
-        n[2]
+    // Animate through stages while waiting for API
+    const stageTimer1 = setTimeout(() => {
+      setNodes([
+        { id: "issue", name: "Issue Agent", icon: <FileText className="w-5 h-5" />, status: "done", time: "analyzing..." },
+        { id: "code", name: "Code Agent", icon: <Settings className="w-5 h-5" />, status: "running" },
+        { id: "fix", name: "Fix Agent", icon: <Play className="w-5 h-5" />, status: "idle" },
       ]);
-      setActivePanel(1);
-    }, 3500);
+    }, 5000);
 
-    // Simulate Agent 2
-    setTimeout(() => {
-      setNodes(n => [
-        n[0],
-        { ...n[1], status: "done", time: "8.1s" },
-        { ...n[2], status: "running" }
+    const stageTimer2 = setTimeout(() => {
+      setNodes([
+        { id: "issue", name: "Issue Agent", icon: <FileText className="w-5 h-5" />, status: "done", time: "done" },
+        { id: "code", name: "Code Agent", icon: <Settings className="w-5 h-5" />, status: "done", time: "analyzing..." },
+        { id: "fix", name: "Fix Agent", icon: <Play className="w-5 h-5" />, status: "running" },
       ]);
-      setActivePanel(2);
-    }, 8000);
+    }, 12000);
 
-    // Simulate Agent 3
-    setTimeout(() => {
-      setNodes(n => [
-        n[0], n[1],
-        { ...n[2], status: "done", time: "14.5s" }
+    try {
+      const result = await getFixPlan(issueUrl, repoUrl);
+      clearTimeout(stageTimer1);
+      clearTimeout(stageTimer2);
+
+      setData(result);
+
+      // All agents done
+      setNodes([
+        { id: "issue", name: "Issue Agent", icon: <FileText className="w-5 h-5" />, status: "done", time: "✓" },
+        { id: "code", name: "Code Agent", icon: <Settings className="w-5 h-5" />, status: "done", time: "✓" },
+        { id: "fix", name: "Fix Agent", icon: <Play className="w-5 h-5" />, status: "done", time: "✓" },
       ]);
-      setActivePanel(3);
-    }, 15000);
+      setActivePanel(3); // Show all panels
+    } catch (err: any) {
+      clearTimeout(stageTimer1);
+      clearTimeout(stageTimer2);
+      setError(err.message || "An unexpected error occurred.");
+      setNodes(nodes.map(n => ({ ...n, status: "idle" as const, time: undefined })));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyPlan = () => {
+    if (!data?.fix_plan) return;
+    const text = data.fix_plan.steps.map(s =>
+      `Step ${s.number}: ${s.title}\n${s.description}\n\n${s.snippet}\n`
+    ).join("\n---\n\n");
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -77,7 +110,8 @@ export default function IssueHelper() {
               type="text"
               className="block w-full pl-10 pr-3 py-3 border border-border-color rounded-lg bg-background text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               placeholder="Repository URL"
-              defaultValue="https://github.com/facebook/react"
+              value={repoUrl}
+              onChange={(e) => setRepoUrl(e.target.value)}
             />
           </div>
           <div className="relative flex-1">
@@ -88,29 +122,32 @@ export default function IssueHelper() {
               type="text"
               className="block w-full pl-10 pr-3 py-3 border border-border-color rounded-lg bg-background text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
               placeholder="Issue URL"
-              defaultValue="https://github.com/facebook/react/issues/28924"
+              value={issueUrl}
+              onChange={(e) => setIssueUrl(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="flex space-x-2">
-            <button className="px-4 py-2 rounded-md bg-surface border border-border-color text-text-secondary text-sm hover:text-text-primary hover:border-primary transition-colors">
-              Issue Only
-            </button>
-            <button className="px-4 py-2 rounded-md bg-surface border border-border-color text-text-secondary text-sm hover:text-text-primary hover:border-primary transition-colors">
-              Issue + Code
-            </button>
-          </div>
-          
-          <button 
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+          <button
             onClick={runAnalysis}
-            className="flex-1 sm:flex-none flex items-center justify-center px-8 py-3 bg-gradient-to-r from-primary to-indigo-600 text-white font-bold rounded-lg hover:shadow-glow transition-all hover:-translate-y-0.5"
+            disabled={loading}
+            className="flex-1 sm:flex-none flex items-center justify-center px-8 py-3 bg-gradient-to-r from-primary to-indigo-600 text-white font-bold rounded-lg hover:shadow-glow transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Run Full Analysis
+            {loading ? (
+              <span className="flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running Pipeline...</span>
+            ) : (
+              "Run Full Analysis"
+            )}
           </button>
         </div>
       </GlassCard>
+
+      {error && (
+        <div className="mb-8 p-4 bg-critical/10 border border-critical/30 rounded-lg text-critical text-sm">
+          <span className="font-bold">Analysis Failed: </span>{error}
+        </div>
+      )}
 
       <div className="mb-10">
         <AgentPipelineVisualizer nodes={nodes} />
@@ -118,7 +155,7 @@ export default function IssueHelper() {
 
       <div className="space-y-6">
         <AnimatePresence>
-          {activePanel >= 1 && (
+          {data && activePanel >= 1 && data.issue_summary && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -132,32 +169,33 @@ export default function IssueHelper() {
                   </div>
                   <h2 className="text-xl font-heading font-bold">1. Issue Breakdown</h2>
                   <div className="ml-auto">
-                    <DifficultyBadge level="Intermediate" size="lg" />
+                    <DifficultyBadge level={(data.issue_summary.difficulty || "Intermediate") as any} size="lg" />
                   </div>
                 </div>
-                
+
                 <div className="text-text-primary mb-6 text-sm leading-relaxed">
-                  <StreamingText text="The user is reporting an inconsistency in how `useLayoutEffect` behaves during Server-Side Rendering (SSR). React currently prints a warning when `useLayoutEffect` is used in SSR because it cannot read from the layout synchronously before the browser paints. The requested fix is to either silence this warning conditionally or provide a clearer error message guiding developers to use `useEffect` or conditionally render the component." />
+                  <StreamingText text={data.issue_summary.plain_summary || "No summary available."} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="block text-xs text-text-secondary uppercase tracking-wider mb-2">Affected Areas</span>
-                    <div className="flex gap-2">
-                      <span className="px-3 py-1 bg-surface-raised border border-border-color rounded-md text-sm">Server Rendering</span>
-                      <span className="px-3 py-1 bg-surface-raised border border-border-color rounded-md text-sm">Hooks API</span>
+                    <div className="flex flex-wrap gap-2">
+                      {(data.issue_summary.affected_areas || []).map((area: string) => (
+                        <span key={area} className="px-3 py-1 bg-surface-raised border border-border-color rounded-md text-sm">{area}</span>
+                      ))}
                     </div>
                   </div>
                   <div>
                     <span className="block text-xs text-text-secondary uppercase tracking-wider mb-2">Estimated Time</span>
-                    <span className="text-sm font-bold text-text-primary">~2 hours</span>
+                    <span className="text-sm font-bold text-text-primary">~{data.issue_summary.estimated_hours || "?"} hours</span>
                   </div>
                 </div>
               </GlassCard>
             </motion.div>
           )}
 
-          {activePanel >= 2 && (
+          {data && activePanel >= 2 && data.affected_files && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -171,15 +209,12 @@ export default function IssueHelper() {
                   </div>
                   <h2 className="text-xl font-heading font-bold">2. Code Discovery</h2>
                 </div>
-                
-                <p className="text-sm text-text-secondary mb-4">The Code Agent has traversed the AST and identified the exact files and call paths related to `useLayoutEffect` and SSR warnings.</p>
+
+                <p className="text-sm text-text-secondary mb-4">The Code Agent has identified the files most likely related to this issue.</p>
 
                 <div className="space-y-3 mb-6">
-                  {[
-                    { path: "packages/react-dom/src/server/ReactDOMLegacyServerBrowser.js", reason: "Contains the warning logic for useLayoutEffect during SSR." },
-                    { path: "packages/react-reconciler/src/ReactFiberHooks.js", reason: "Dispatcher mapping for hooks on the server." }
-                  ].map((file, i) => (
-                    <motion.div 
+                  {(data.affected_files || []).map((file, i) => (
+                    <motion.div
                       key={file.path}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -195,7 +230,7 @@ export default function IssueHelper() {
             </motion.div>
           )}
 
-          {activePanel >= 3 && (
+          {data && activePanel >= 3 && data.fix_plan && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -208,55 +243,51 @@ export default function IssueHelper() {
                     <Play className="w-5 h-5" />
                   </div>
                   <h2 className="text-xl font-heading font-bold text-success">3. Implementation Plan</h2>
-                  <button className="ml-auto flex items-center space-x-2 text-sm text-text-secondary hover:text-white transition-colors bg-surface-raised px-3 py-1.5 rounded border border-border-color">
+                  <button
+                    onClick={copyPlan}
+                    className="ml-auto flex items-center space-x-2 text-sm text-text-secondary hover:text-white transition-colors bg-surface-raised px-3 py-1.5 rounded border border-border-color"
+                  >
                     <Copy className="w-4 h-4" />
-                    <span>Copy Plan</span>
+                    <span>{copied ? "Copied!" : "Copy Plan"}</span>
                   </button>
                 </div>
 
                 <div className="space-y-6">
                   <div className="relative pl-6 border-l-2 border-primary/30 space-y-6">
-                    <div className="relative">
-                      <div className="absolute -left-[35px] w-8 h-8 rounded-full bg-surface border-2 border-primary flex items-center justify-center text-primary font-bold text-sm">1</div>
-                      <h4 className="text-md font-bold mb-2">Update the Dispatcher</h4>
-                      <p className="text-sm text-text-secondary mb-3">In `ReactFiberHooks.js`, modify the `useLayoutEffect` dispatcher for the server environment to throw a specific warning or conditionally bypass if a certain config flag is passed.</p>
-                      <div className="bg-[#1E1E1E] rounded-md overflow-hidden border border-border-color">
-                        <div className="flex items-center px-4 py-2 bg-black/40 border-b border-border-color/50 text-xs text-text-secondary">
-                          packages/react-reconciler/src/ReactFiberHooks.js
+                    {(data.fix_plan.steps || []).map((step) => (
+                      <div key={step.number} className="relative">
+                        <div className="absolute -left-[35px] w-8 h-8 rounded-full bg-surface border-2 border-primary flex items-center justify-center text-primary font-bold text-sm">
+                          {step.number}
                         </div>
-                        <pre className="p-4 text-xs font-mono text-[#D4D4D4] overflow-x-auto">
-<span className="text-[#C586C0]">export</span> <span className="text-[#569CD6]">function</span> <span className="text-[#DCDCAA]">useLayoutEffect</span>(
-  create: () <span className="text-[#569CD6]">=&gt;</span> (() <span className="text-[#569CD6]">=&gt;</span> <span className="text-[#569CD6]">void</span>) | <span className="text-[#569CD6]">void</span>,
-  deps: <span className="text-[#4EC9B0]">Array</span>&lt;<span className="text-[#4EC9B0]">mixed</span>&gt; | <span className="text-[#569CD6]">void</span> | <span className="text-[#569CD6]">null</span>,
-): <span className="text-[#569CD6]">void</span> {"{"}
-<span className="text-[#569CD6]">  if</span> (<span className="text-[#9CDCFE]">__DEV__</span>) {"{"}
-    <span className="text-[#C586C0]">if</span> (<span className="text-[#9CDCFE]">currentDispatcher</span> === <span className="text-[#9CDCFE]">ContextOnlyDispatcher</span>) {"{"}
-      <span className="text-[#4FC1FF]">console</span>.<span className="text-[#DCDCAA]">error</span>(
-        <span className="text-[#CE9178]">'useLayoutEffect does nothing on the server, because its effect cannot '</span> +
-        <span className="text-[#CE9178]">'be encoded into the server renderer\'s output format. This will lead '</span> +
-        <span className="text-[#CE9178]">'to a mismatch between the initial, non-hydrated UI and the intended UI. '</span> +
-        <span className="text-[#CE9178]">'To avoid this, useLayoutEffect should only be used in components that '</span> +
-        <span className="text-[#CE9178]">'render exclusively on the client. See https://reactjs.org/link/uselayouteffect-ssr'</span>
-      );
-    {"}"}
-  {"}"}
-  <span className="text-[#C586C0]">return</span> <span className="text-[#9CDCFE]">currentDispatcher</span>.<span className="text-[#DCDCAA]">useLayoutEffect</span>(create, deps);
-{"}"}
-                        </pre>
+                        <h4 className="text-md font-bold mb-2">{step.title}</h4>
+                        <p className="text-sm text-text-secondary mb-3">{step.description}</p>
+                        {step.snippet && (
+                          <div className="bg-[#1E1E1E] rounded-md overflow-hidden border border-border-color">
+                            <div className="flex items-center px-4 py-2 bg-black/40 border-b border-border-color/50 text-xs text-text-secondary">
+                              {(step.files_modified || []).join(", ") || "Code Snippet"}
+                            </div>
+                            <pre className="p-4 text-xs font-mono text-[#D4D4D4] overflow-x-auto whitespace-pre-wrap">
+                              {step.snippet}
+                            </pre>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    ))}
                   </div>
 
-                  <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start space-x-3">
-                    <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h5 className="text-sm font-bold text-warning mb-1">Edge Cases to Consider</h5>
-                      <ul className="text-sm text-text-secondary list-disc pl-4 space-y-1">
-                        <li>Ensure the warning does not fire multiple times per render cycle (use a Set or global flag to deduplicate).</li>
-                        <li>Check compatibility with React 18 Concurrent Server Rendering (Suspense).</li>
-                      </ul>
+                  {data.fix_plan.edge_cases && data.fix_plan.edge_cases.length > 0 && (
+                    <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start space-x-3">
+                      <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h5 className="text-sm font-bold text-warning mb-1">Edge Cases to Consider</h5>
+                        <ul className="text-sm text-text-secondary list-disc pl-4 space-y-1">
+                          {data.fix_plan.edge_cases.map((ec, i) => (
+                            <li key={i}>{ec}</li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </GlassCard>
             </motion.div>
