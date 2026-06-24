@@ -1,8 +1,11 @@
+import uuid
+import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class RepoAnalyzeRequest(BaseModel):
@@ -28,7 +31,7 @@ async def analyze_repo(request: RepoAnalyzeRequest):
         "user_role": "contributor",
         "intent": "analyze_repo",
         "payload": {"repo_url": request.repo_url},
-        "session_id": "test_session",
+        "session_id": str(uuid.uuid4()),
     }
 
     result = orchestrator.invoke(state)
@@ -48,7 +51,7 @@ async def explain_issue(request: IssueExplainRequest):
         "user_role": "contributor",
         "intent": "explain_issue",
         "payload": {"issue_url": request.issue_url},
-        "session_id": request.session_id or "test_session",
+        "session_id": request.session_id or str(uuid.uuid4()),
     }
 
     result = orchestrator.invoke(state)
@@ -71,7 +74,7 @@ async def fix_plan(request: FixPlanRequest):
         "user_role": "contributor",
         "intent": "generate_fix",
         "payload": {"issue_url": request.issue_url, "repo_url": request.repo_url},
-        "session_id": request.session_id or "test_session",
+        "session_id": request.session_id or str(uuid.uuid4()),
     }
 
     result = orchestrator.invoke(state)

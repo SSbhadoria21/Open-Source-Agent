@@ -1,80 +1,129 @@
+"""
+Admin API endpoints — TRD §5.4, §5.5, §5.7, §5.8
+
+All session IDs are generated per-request (uuid4).
+Period and similarity_threshold params are properly threaded through.
+"""
+import uuid
+import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional
+from app.agents.orchestrator import orchestrator
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
+
+# ─── Request / Response models ────────────────────────────────────────────────
 
 class TriageRequest(BaseModel):
     issue_url: str
-    repo_url: str
+    repo_url: str = None
 
 
-class DetectDuplicateRequest(BaseModel):
+class DuplicateRequest(BaseModel):
     issue_url: str
-    repo_url: str
-    similarity_threshold: int = 85
+    repo_url: str = None
+    similarity_threshold: int = None   # falls back to settings default inside agent
 
+
+class MatchRequest(BaseModel):
+    issue_url: str
+    repo_url: str = None
+
+
+# ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/triage")
 async def triage_issue(request: TriageRequest):
-    from app.agents.orchestrator import orchestrator
-
-    state = {
-        "user_role": "admin",
-        "intent": "triage_issue",
-        "payload": {"issue_url": request.issue_url, "repo_url": request.repo_url},
-        "session_id": "admin_session",
-    }
-
-    result = orchestrator.invoke(state)
-    triage_result = result.get("triage_result", {})
-
-    if isinstance(triage_result, dict) and "error" in triage_result:
-        return {"error": triage_result["error"]}
-
-    return {"message": "Issue triaged", "triage_result": triage_result}
+    """Classify and prioritize an incoming GitHub issue."""
+    session_id = str(uuid.uuid4())
+    try:
+        state = orchestrator.invoke({
+            "intent": "triage_issue",
+            "session_id": session_id,
+            "payload": {
+                "issue_url": request.issue_url,
+                "repo_url": request.repo_url,
+            },
+        })
+        return {
+            "message": "Issue triage complete.",
+            "session_id": session_id,
+            "triage_result": state.get("triage_result", {}),
+        }
+    except Exception as e:
+        logger.error("admin/triage error: %s", e, exc_info=True)
+        return {"error": str(e)}
 
 
 @router.post("/detect-duplicate")
-async def detect_duplicate(request: DetectDuplicateRequest):
-    from app.agents.orchestrator import orchestrator
+async def detect_duplicate(request: DuplicateRequest):
+    """Detect whether an issue is a duplicate using Chroma embeddings."""
+    session_id = str(uuid.uuid4())
+    try:
+        state = orchestrator.invoke({
+            "intent": "detect_duplicate",
+            "session_id": session_id,
+            "payload": {
+                "issue_url": request.issue_url,
+                "repo_url": request.repo_url,
+                # thread similarity_threshold — agent uses settings default if None
+                "similarity_threshold": request.similarity_threshold,
+            },
+        })
+        return {
+            "message": "Duplicate detection complete.",
+            "session_id": session_id,
+            "duplicate_result": state.get("duplicate_result", {}),
+        }
+    except Exception as e:
+        logger.error("admin/detect-duplicate error: %s", e, exc_info=True)
+        return {"error": str(e)}
 
-    state = {
-        "user_role": "admin",
-        "intent": "detect_duplicate",
-        "payload": {
-            "issue_url": request.issue_url,
-            "repo_url": request.repo_url,
-            "threshold": request.similarity_threshold,
-        },
-        "session_id": "admin_session",
-    }
 
-    result = orchestrator.invoke(state)
-    duplicate_result = result.get("duplicate_result", {})
+@router.post("/match-contributor")
+async def match_contributor(request: MatchRequest):
+    """Match contributors to an issue based on real PR history."""
+    session_id = str(uuid.uuid4())
+    try:
+        state = orchestrator.invoke({
+            "intent": "match_contributor",
+            "session_id": session_id,
+            "payload": {
+                "issue_url": request.issue_url,
+                "repo_url": request.repo_url,
+            },
+        })
+        return {
+            "message": "Contributor matching complete.",
+            "session_id": session_id,
+            "match_result": state.get("match_result", {}),
+        }
+    except Exception as e:
+        logger.error("admin/match-contributor error: %s", e, exc_info=True)
+        return {"error": str(e)}
 
-    if isinstance(duplicate_result, dict) and "error" in duplicate_result:
-        return {"error": duplicate_result["error"]}
 
-    return {"message": "Duplicate detection run", "duplicate_result": duplicate_result}
-
-
-@router.get("/health/{repo_full_name:path}")
-async def project_health(repo_full_name: str, period: str = "30d"):
-    from app.agents.orchestrator import orchestrator
-
-    state = {
-        "user_role": "admin",
-        "intent": "project_health",
-        "payload": {"repo_url": repo_full_name, "period": period},
-        "session_id": "admin_session",
-    }
-
-    result = orchestrator.invoke(state)
-    health_report = result.get("health_report", {})
-
-    if isinstance(health_report, dict) and "error" in health_report:
-        return {"error": health_report["error"]}
-
-    return {"message": "Project health retrieved", "health_report": health_report}
+@router.get("/health/{owner}/{repo}")
+async def project_health(owner: str, repo: str, period: str = "30d"):
+    """Fetch real project health metrics from GitHub and generate an AI narrative."""
+    session_id = str(uuid.uuid4())
+    repo_url = f"https://github.com/{owner}/{repo}"
+    try:
+        state = orchestrator.invoke({
+            "intent": "project_health",
+            "session_id": session_id,
+            "payload": {
+                "repo_url": repo_url,
+                "period": period,       # threaded through to health_agent
+            },
+        })
+        return {
+            "message": "Health report generated.",
+            "session_id": session_id,
+            "health_report": state.get("health_report", {}),
+        }
+    except Exception as e:
+        logger.error("admin/health error: %s", e, exc_info=True)
+        return {"error": str(e)}

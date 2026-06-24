@@ -1,8 +1,11 @@
+import uuid
+import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ReviewPRRequest(BaseModel):
@@ -18,8 +21,11 @@ async def review_pr(request: ReviewPRRequest):
     state = {
         "user_role": request.mode,
         "intent": "review_pr",
-        "payload": {"pr_url": request.pr_url},
-        "session_id": request.session_id or "test_session",
+        "payload": {
+            "pr_url": request.pr_url,
+            "mode": request.mode,   # wired to review_agent_node → review_pr(mode=...)
+        },
+        "session_id": request.session_id or str(uuid.uuid4()),
     }
 
     result = orchestrator.invoke(state)

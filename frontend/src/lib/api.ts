@@ -153,6 +153,7 @@ export interface HealthResponse {
   health_report: HealthReport;
 }
 
-export async function getProjectHealth(repoFullName: string): Promise<HealthResponse> {
-  return apiRequest<HealthResponse>(`/admin/health/${repoFullName}`);
+export async function getProjectHealth(repoFullName: string, period: string = "30d"): Promise<HealthResponse> {
+  const params = period !== "30d" ? `?period=${period}` : "";
+  return apiRequest<HealthResponse>(`/admin/health/${repoFullName}${params}`);
 }

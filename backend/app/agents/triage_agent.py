@@ -1,8 +1,13 @@
 import json
+import logging
 from typing import Dict, Any
 from langchain_core.prompts import PromptTemplate
 from app.services.github import github_client
 from app.services.llm import llm
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
 
 def triage_issue(issue_url: str) -> Dict[str, Any]:
     """Classify and prioritize incoming issues automatically."""
@@ -32,11 +37,17 @@ def triage_issue(issue_url: str) -> Dict[str, Any]:
         chain = prompt | llm
         response = chain.invoke({
             "title": issue_data.get("title", ""),
-            "body": issue_data.get("body", "")[:2000]
+            "body": issue_data.get("body", "")[:settings.MAX_ISSUE_BODY_CHARS]
         })
         
         result_text = response.content.replace("```json", "").replace("```", "").strip()
         return json.loads(result_text)
         
+    except json.JSONDecodeError as e:
+        logger.error("triage_agent: LLM returned invalid JSON: %s", e)
+        return {"error": f"LLM response parsing failed: {e}"}
+    except RuntimeError as e:
+        return {"error": str(e)}
     except Exception as e:
+        logger.error("triage_agent error: %s", e, exc_info=True)
         return {"error": str(e)}

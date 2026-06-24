@@ -1,40 +1,36 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from app.api.router import api_router
+from app.api.endpoints import contributor, review, admin, webhooks
 from app.core.config import settings
+import logging
+
+logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL, logging.INFO))
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
-# Set all CORS enabled origins
+# ─── CORS ──────────────────────────────────────────────────────────────────────
+# Use the explicit origins list from settings rather than wildcard.
+# Explicit origins + allow_credentials=True enables cookie/auth flows;
+# wildcard "*" would break them.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins in development
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Return clean JSON error responses for unhandled exceptions."""
-    return JSONResponse(
-        status_code=500,
-        content={"error": str(exc), "detail": "An internal server error occurred."},
-    )
-
-
-@app.get("/")
-def root():
-    return {"message": "Welcome to the Open Source Mentee Agent API"}
+# ─── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(contributor.router, prefix=f"{settings.API_V1_STR}/contributor", tags=["contributor"])
+app.include_router(review.router, prefix=f"{settings.API_V1_STR}/review", tags=["review"])
+app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
+app.include_router(webhooks.router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["webhooks"])
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok", "project": settings.PROJECT_NAME}
+async def health_check():
+    return {"status": "ok", "service": settings.PROJECT_NAME}

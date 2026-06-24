@@ -8,11 +8,12 @@ class AgentState(TypedDict, total=False):
     payload: Dict[str, Any]
     session_id: str
 
-    # Optional outputs
+    # Optional agent outputs
     repo_summary: Dict[str, Any]
     issue_summary: Dict[str, Any]
     affected_files: List[Dict[str, Any]]
     call_graph: Dict[str, Any]
+    file_contents: Dict[str, str]     # real file content fetched by code_agent → passed to fix_agent
     fix_plan: Dict[str, Any]
     pr_review: Dict[str, Any]
     triage_result: Dict[str, Any]
@@ -25,8 +26,6 @@ class AgentState(TypedDict, total=False):
 def orchestrator_router(state: AgentState) -> str:
     """Route to appropriate sub-agent based on intent."""
     intent = state.get("intent")
-
-    # Map intents to nodes
     routes = {
         "analyze_repo": "repo_agent",
         "explain_issue": "issue_agent",
@@ -39,9 +38,10 @@ def orchestrator_router(state: AgentState) -> str:
         "match_contributor": "match_agent",
         "project_health": "health_agent",
     }
-
     return routes.get(intent, END)
 
+
+# ─── Imports (after class definition to avoid circular import) ────────────────
 
 from app.agents.repo_agent import analyze_repository
 from app.agents.issue_agent import explain_issue
@@ -54,6 +54,8 @@ from app.agents.label_agent import label_issue
 from app.agents.match_agent import match_contributor
 from app.agents.health_agent import project_health
 
+
+# ─── Node functions ───────────────────────────────────────────────────────────
 
 def repo_agent_node(state: AgentState) -> AgentState:
     repo_url = state["payload"].get("repo_url")
@@ -73,6 +75,8 @@ def code_agent_node(state: AgentState) -> AgentState:
     code_result = trace_code(repo_url, issue_summary)
     state["affected_files"] = code_result.get("affected_files", [])
     state["call_graph"] = code_result.get("call_graph", {})
+    # Store real file contents so fix_agent can use them
+    state["file_contents"] = code_result.get("file_contents", {})
     return state
 
 
@@ -80,13 +84,15 @@ def fix_agent_node(state: AgentState) -> AgentState:
     issue_summary = state.get("issue_summary", {})
     affected_files = state.get("affected_files", [])
     call_graph = state.get("call_graph", {})
-    state["fix_plan"] = generate_fix(issue_summary, affected_files, call_graph)
+    file_contents = state.get("file_contents", {})   # real content from code_agent
+    state["fix_plan"] = generate_fix(issue_summary, affected_files, call_graph, file_contents)
     return state
 
 
 def review_agent_node(state: AgentState) -> AgentState:
     pr_url = state["payload"].get("pr_url")
-    state["pr_review"] = review_pr(pr_url)
+    mode = state["payload"].get("mode", "contributor")  # wire mode through
+    state["pr_review"] = review_pr(pr_url, mode=mode)
     return state
 
 
@@ -99,7 +105,10 @@ def triage_agent_node(state: AgentState) -> AgentState:
 def duplicate_agent_node(state: AgentState) -> AgentState:
     issue_url = state["payload"].get("issue_url")
     repo_url = state["payload"].get("repo_url")
-    state["duplicate_result"] = detect_duplicate(issue_url, repo_url)
+    similarity_threshold = state["payload"].get("similarity_threshold", None)
+    state["duplicate_result"] = detect_duplicate(
+        issue_url, repo_url, similarity_threshold=similarity_threshold
+    )
     return state
 
 
@@ -112,17 +121,20 @@ def label_agent_node(state: AgentState) -> AgentState:
 
 def match_agent_node(state: AgentState) -> AgentState:
     issue_url = state["payload"].get("issue_url")
-    state["match_result"] = match_contributor(issue_url)
+    repo_url = state["payload"].get("repo_url")
+    state["match_result"] = match_contributor(issue_url, repo_url=repo_url)
     return state
 
 
 def health_agent_node(state: AgentState) -> AgentState:
     repo_url = state["payload"].get("repo_url")
-    state["health_report"] = project_health(repo_url)
+    period = state["payload"].get("period", "30d")   # wire period through
+    state["health_report"] = project_health(repo_url, period=period)
     return state
 
 
-# Intermediate routing for complex flows
+# ─── Conditional edges for multi-step flows ──────────────────────────────────
+
 def after_issue_agent(state: AgentState) -> str:
     intent = state.get("intent")
     if intent in ["trace_code", "generate_fix"]:
@@ -137,10 +149,11 @@ def after_code_agent(state: AgentState) -> str:
     return END
 
 
+# ─── Graph construction ───────────────────────────────────────────────────────
+
 def build_orchestrator_graph():
     workflow = StateGraph(AgentState)
 
-    # Add nodes
     workflow.add_node("repo_agent", repo_agent_node)
     workflow.add_node("issue_agent", issue_agent_node)
     workflow.add_node("code_agent", code_agent_node)
@@ -152,7 +165,6 @@ def build_orchestrator_graph():
     workflow.add_node("match_agent", match_agent_node)
     workflow.add_node("health_agent", health_agent_node)
 
-    # Use the current LangGraph API: conditional edges from START
     workflow.add_conditional_edges(
         START,
         orchestrator_router,
@@ -169,14 +181,12 @@ def build_orchestrator_graph():
         },
     )
 
-    # Define edges from simple nodes to END
     for node in [
         "repo_agent", "fix_agent", "review_agent", "triage_agent",
         "duplicate_agent", "label_agent", "match_agent", "health_agent",
     ]:
         workflow.add_edge(node, END)
 
-    # Define conditional edges for multi-step flows
     workflow.add_conditional_edges("issue_agent", after_issue_agent, {
         "code_agent": "code_agent",
         END: END,
