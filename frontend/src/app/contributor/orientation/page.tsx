@@ -59,7 +59,9 @@ export default function RepoOrientation() {
       }
 
       const result = await response.json();
-      if (result.repo_summary) {
+      if (result.error) {
+        throw new Error(result.error);
+      } else if (result.repo_summary) {
         setData(result.repo_summary);
         setStep(4);
         setComplete(true);
