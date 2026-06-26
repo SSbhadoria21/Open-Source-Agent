@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Target, Copy, Tag, Users, Activity, FileText, Settings } from "lucide-react";
+import { Target, Copy, Tag, Users, Activity, FileText, Settings, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const navItems = [
+    { name: "Dashboard", path: "/admin", icon: <BarChart2 className="w-5 h-5" /> },
     { name: "Triage Agent", path: "/admin/triage", icon: <Target className="w-5 h-5" /> },
     { name: "Duplicates", path: "/admin/duplicates", icon: <Copy className="w-5 h-5" /> },
     { name: "Label Agent", path: "/admin/labels", icon: <Tag className="w-5 h-5" /> },

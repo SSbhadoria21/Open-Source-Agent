@@ -17,6 +17,7 @@ const config: Config = {
         success: "#00E5A0",
         warning: "#FFB800",
         critical: "#FF4444",
+        accent: "#E028CC",
         "text-primary": "#EAEAF5",
         "text-secondary": "#8888AA",
         "border-color": "rgba(110, 86, 207, 0.2)",
@@ -32,6 +33,8 @@ const config: Config = {
       boxShadow: {
         glow: "0 0 20px rgba(110, 86, 207, 0.4)",
         "glow-secondary": "0 0 20px rgba(0, 212, 255, 0.4)",
+        "glow-accent": "0 0 20px rgba(224, 40, 204, 0.4)",
+        "glow-critical": "0 0 20px rgba(255, 68, 68, 0.4)",
       },
       animation: {
         shimmer: "shimmer 2s linear infinite",

@@ -10,11 +10,11 @@ export default function ContributorLayout({ children }: { children: React.ReactN
   const pathname = usePathname();
 
   const navItems = [
+    { name: "Dashboard", path: "/contributor", icon: <BarChart2 className="w-5 h-5" /> },
     { name: "Repo Orientation", path: "/contributor/orientation", icon: <Map className="w-5 h-5" /> },
     { name: "Issue Feed", path: "/contributor/issues", icon: <List className="w-5 h-5" /> },
     { name: "Issue Helper", path: "/contributor/issue-helper", icon: <Brain className="w-5 h-5" /> },
     { name: "PR Review", path: "/contributor/pr-review", icon: <Search className="w-5 h-5" /> },
-    { name: "My Stats", path: "#", icon: <BarChart2 className="w-5 h-5" /> },
   ];
 
   return (
