@@ -3,21 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: #0A0A0F;
-  --foreground: #EAEAF5;
+  --background: #05050A;
+  --foreground: #F5F5FA;
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background: #05050A;
+  /* Deep black and dark purple gradient background */
   background-image: 
-    radial-gradient(circle at 15% 50%, rgba(110, 86, 207, 0.05), transparent 40%),
-    radial-gradient(circle at 85% 30%, rgba(0, 212, 255, 0.05), transparent 40%);
+    radial-gradient(circle at 50% 0%, rgba(110, 86, 207, 0.15), transparent 50%),
+    radial-gradient(circle at 0% 100%, rgba(224, 40, 204, 0.08), transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(0, 212, 255, 0.08), transparent 40%);
   background-attachment: fixed;
   position: relative;
   min-height: 100vh;
 }
 
+/* Subtle scanlines for futuristic gaming console feel */
 body::before {
   content: "";
   position: fixed;
@@ -25,25 +28,86 @@ body::before {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 1px,
-    rgba(255, 255, 255, 0.03) 1px,
-    rgba(255, 255, 255, 0.03) 2px
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
   );
+  background-size: 100% 4px;
   pointer-events: none;
   z-index: 9999;
+  opacity: 0.4;
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 15, 26, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(110, 86, 207, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(224, 40, 204, 0.6);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
-  .glass-card {
-    @apply bg-surface/80 backdrop-blur-md border border-border-color shadow-sm transition-all duration-300 rounded-xl p-6;
+  
+  /* Futuristic system glow effects */
+  .text-glow-primary {
+    text-shadow: 0 0 10px rgba(110, 86, 207, 0.6);
   }
+  .text-glow-accent {
+    text-shadow: 0 0 10px rgba(224, 40, 204, 0.6);
+  }
+  .text-glow-secondary {
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+  }
+  .text-glow-success {
+    text-shadow: 0 0 10px rgba(0, 229, 160, 0.6);
+  }
+
+  .border-glow-primary {
+    box-shadow: 0 0 15px rgba(110, 86, 207, 0.3);
+    border-color: rgba(110, 86, 207, 0.5);
+  }
+  
+  .border-glow-accent {
+    box-shadow: 0 0 15px rgba(224, 40, 204, 0.3);
+    border-color: rgba(224, 40, 204, 0.5);
+  }
+
+  /* Glassmorphism utility card */
+  .glass-card {
+    background: rgba(15, 15, 26, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(110, 86, 207, 0.15);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border-radius: 1rem;
+  }
+  
   .glass-card:hover {
-    @apply -translate-y-1 shadow-glow;
+    transform: translateY(-2px);
+    border-color: rgba(110, 86, 207, 0.35);
+    box-shadow: 0 12px 40px 0 rgba(110, 86, 207, 0.15), 0 0 20px rgba(110, 86, 207, 0.1);
+  }
+
+  /* Gaming system button */
+  .system-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border-radius: 0.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { GitBranch, FileText, Settings, Play, Copy, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
+import { GitBranch, FileText, Settings, Play, Copy, AlertTriangle, Loader2, Terminal } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AgentPipelineVisualizer, PipelineNode } from "@/components/ui/AgentPipelineVisualizer";
 import { StreamingText } from "@/components/ui/StreamingText";
@@ -11,7 +11,7 @@ import { DifficultyBadge } from "@/components/ui/DifficultyBadge";
 import { FilePathChip } from "@/components/ui/FilePathChip";
 import { getFixPlan, type FixPlanResponse } from "@/lib/api";
 
-export default function IssueHelper() {
+function IssueHelperContent() {
   const searchParams = useSearchParams();
 
   const [repoUrl, setRepoUrl] = useState(searchParams.get("repo") || "https://github.com/facebook/react");
@@ -94,33 +94,45 @@ export default function IssueHelper() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-heading font-bold mb-2">Issue Helper</h1>
-        <p className="text-text-secondary">Analyze an issue, map the dependencies, and generate a step-by-step fix plan.</p>
+    <div className="max-w-5xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col space-y-1">
+        <span className="text-xs font-bold tracking-[0.25em] text-primary uppercase block mb-1 text-glow-primary">
+          [ Active Calibration: Quest Runner ]
+        </span>
+        <h1 className="text-4xl font-heading font-extrabold text-white uppercase tracking-tight">
+          Issue Helper
+        </h1>
+        <p className="text-text-secondary text-sm">
+          Execute multi-agent intelligence to analyze selected issue parameters, map relevant files, and code recommendations.
+        </p>
       </div>
 
-      <GlassCard className="mb-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+      {/* Target input */}
+      <GlassCard className="border border-primary/20 shadow-glow relative overflow-hidden" glowColor="accent">
+        <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-accent" />
+        <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-accent" />
+        
+        <div className="flex flex-col md:flex-row gap-4 mb-5">
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <GitBranch className="h-5 w-5 text-text-secondary" />
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <GitBranch className="h-5 w-5 text-accent" />
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-3 py-3 border border-border-color rounded-lg bg-background text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              className="block w-full pl-12 pr-4 py-3.5 border border-border-color rounded-xl bg-surface/85 text-white font-mono text-sm focus:outline-none focus:border-accent focus:shadow-[0_0_15px_rgba(224,40,204,0.15)] transition-all"
               placeholder="Repository URL"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
             />
           </div>
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <FileText className="h-5 w-5 text-text-secondary" />
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <FileText className="h-5 w-5 text-accent" />
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-3 py-3 border border-border-color rounded-lg bg-background text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+              className="block w-full pl-12 pr-4 py-3.5 border border-border-color rounded-xl bg-surface/85 text-white font-mono text-sm focus:outline-none focus:border-accent focus:shadow-[0_0_15px_rgba(224,40,204,0.15)] transition-all"
               placeholder="Issue URL"
               value={issueUrl}
               onChange={(e) => setIssueUrl(e.target.value)}
@@ -132,27 +144,35 @@ export default function IssueHelper() {
           <button
             onClick={runAnalysis}
             disabled={loading}
-            className="flex-1 sm:flex-none flex items-center justify-center px-8 py-3 bg-gradient-to-r from-primary to-indigo-600 text-white font-bold rounded-lg hover:shadow-glow transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center justify-center px-10 py-3.5 bg-gradient-to-r from-primary via-accent to-indigo-600 text-white font-extrabold rounded-xl transition-all shadow-glow hover:shadow-[0_0_20px_rgba(110,86,207,0.45)] disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider text-xs border border-primary/30"
           >
             {loading ? (
-              <span className="flex items-center"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running Pipeline...</span>
+              <span className="flex items-center"><Loader2 className="w-4.5 h-4.5 mr-2.5 animate-spin" /> RUNNING ALIGNMENT PIPELINE...</span>
             ) : (
-              "Run Full Analysis"
+              "Initialize Quest Analysis"
             )}
           </button>
         </div>
       </GlassCard>
 
+      {/* Error Output */}
       {error && (
-        <div className="mb-8 p-4 bg-critical/10 border border-critical/30 rounded-lg text-critical text-sm">
-          <span className="font-bold">Analysis Failed: </span>{error}
+        <div className="p-4 bg-critical/10 border border-critical/30 rounded-xl text-critical text-sm flex items-start gap-2.5 shadow-[0_0_15px_rgba(255,68,68,0.1)]">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-critical" />
+          <div>
+            <span className="font-extrabold uppercase tracking-wider block mb-0.5">PIPELINE EXECUTION EXCEPTION</span>
+            <p className="text-text-primary">{error}</p>
+          </div>
         </div>
       )}
 
-      <div className="mb-10">
+      {/* Visualizer */}
+      <div className="bg-surface/50 border border-border-color rounded-2xl p-5 shadow-inner">
+        <span className="text-[10px] font-bold font-mono text-accent uppercase tracking-widest block mb-4">[ Agent Alignment Grid ]</span>
         <AgentPipelineVisualizer nodes={nodes} />
       </div>
 
+      {/* Results */}
       <div className="space-y-6">
         <AnimatePresence>
           {data && activePanel >= 1 && data.issue_summary && (
@@ -162,33 +182,34 @@ export default function IssueHelper() {
               transition={{ duration: 0.5 }}
               className="overflow-hidden"
             >
-              <GlassCard glowColor="primary">
-                <div className="flex items-center space-x-3 mb-4 border-b border-border-color pb-3">
-                  <div className="p-2 bg-primary/20 rounded-md text-primary">
+              <GlassCard glowColor="primary" className="relative">
+                <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-primary" />
+                <div className="flex items-center space-x-3 mb-4 border-b border-primary/20 pb-3">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary border border-primary/30">
                     <FileText className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-heading font-bold">1. Issue Breakdown</h2>
+                  <h2 className="text-sm font-bold font-heading uppercase tracking-wider text-white">1. Issue Breakdown Analysis</h2>
                   <div className="ml-auto">
                     <DifficultyBadge level={(data.issue_summary.difficulty || "Intermediate") as any} size="lg" />
                   </div>
                 </div>
 
-                <div className="text-text-primary mb-6 text-sm leading-relaxed">
+                <div className="text-text-secondary mb-6 text-sm leading-relaxed font-medium">
                   <StreamingText text={data.issue_summary.plain_summary || "No summary available."} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border-color/30 pt-4">
                   <div>
-                    <span className="block text-xs text-text-secondary uppercase tracking-wider mb-2">Affected Areas</span>
+                    <span className="block text-[10px] font-bold font-mono text-accent uppercase tracking-wider mb-2">[ Affected Areas ]</span>
                     <div className="flex flex-wrap gap-2">
                       {(data.issue_summary.affected_areas || []).map((area: string) => (
-                        <span key={area} className="px-3 py-1 bg-surface-raised border border-border-color rounded-md text-sm">{area}</span>
+                        <span key={area} className="px-3 py-1 bg-surface-raised border border-border-color rounded-lg text-xs font-bold font-mono text-text-secondary uppercase">{area}</span>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <span className="block text-xs text-text-secondary uppercase tracking-wider mb-2">Estimated Time</span>
-                    <span className="text-sm font-bold text-text-primary">~{data.issue_summary.estimated_hours || "?"} hours</span>
+                    <span className="block text-[10px] font-bold font-mono text-accent uppercase tracking-wider mb-2">[ Estimated Reward Time ]</span>
+                    <span className="text-sm font-extrabold text-white font-mono uppercase tracking-wide">~{data.issue_summary.estimated_hours || "?"} hours</span>
                   </div>
                 </div>
               </GlassCard>
@@ -202,27 +223,28 @@ export default function IssueHelper() {
               transition={{ duration: 0.5 }}
               className="overflow-hidden"
             >
-              <GlassCard glowColor="secondary">
-                <div className="flex items-center space-x-3 mb-4 border-b border-border-color pb-3">
-                  <div className="p-2 bg-secondary/20 rounded-md text-secondary">
+              <GlassCard glowColor="secondary" className="relative">
+                <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-secondary" />
+                <div className="flex items-center space-x-3 mb-4 border-b border-secondary/20 pb-3">
+                  <div className="p-2 bg-secondary/10 rounded-lg text-secondary border border-secondary/30">
                     <Settings className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-heading font-bold">2. Code Discovery</h2>
+                  <h2 className="text-sm font-bold font-heading uppercase tracking-wider text-white">2. Affected Code Discovery</h2>
                 </div>
 
-                <p className="text-sm text-text-secondary mb-4">The Code Agent has identified the files most likely related to this issue.</p>
+                <p className="text-xs text-text-secondary mb-4 font-medium uppercase tracking-wider">// CODE AGENT HAS TRACED MODIFICATION FILES:</p>
 
-                <div className="space-y-3 mb-6">
+                <div className="space-y-3 mb-2">
                   {(data.affected_files || []).map((file, i) => (
                     <motion.div
                       key={file.path}
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, x: -15 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.2 }}
-                      className="p-3 bg-surface-raised rounded-lg border border-border-color flex flex-col space-y-2"
+                      transition={{ delay: i * 0.1 }}
+                      className="p-3 bg-surface-raised rounded-xl border border-border-color/60 hover:border-secondary/35 transition-all flex flex-col space-y-2"
                     >
                       <FilePathChip path={file.path} />
-                      <span className="text-sm text-text-secondary">{file.reason}</span>
+                      <span className="text-xs text-text-secondary leading-relaxed font-mono">{file.reason}</span>
                     </motion.div>
                   ))}
                 </div>
@@ -237,36 +259,38 @@ export default function IssueHelper() {
               transition={{ duration: 0.5 }}
               className="overflow-hidden"
             >
-              <GlassCard>
-                <div className="flex items-center space-x-3 mb-4 border-b border-border-color pb-3">
-                  <div className="p-2 bg-success/20 rounded-md text-success shadow-[0_0_10px_rgba(0,229,160,0.3)]">
+              <GlassCard glowColor="success" className="relative">
+                <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-success" />
+                <div className="flex items-center space-x-3 mb-5 border-b border-success/20 pb-3">
+                  <div className="p-2 bg-success/15 rounded-lg text-success border border-success/30 shadow-[0_0_10px_rgba(0,229,160,0.2)]">
                     <Play className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-heading font-bold text-success">3. Implementation Plan</h2>
+                  <h2 className="text-sm font-bold font-heading uppercase tracking-wider text-success">3. AI Implementation Guide</h2>
                   <button
                     onClick={copyPlan}
-                    className="ml-auto flex items-center space-x-2 text-sm text-text-secondary hover:text-white transition-colors bg-surface-raised px-3 py-1.5 rounded border border-border-color"
+                    className="ml-auto flex items-center space-x-2 text-[10px] font-bold font-mono text-text-secondary hover:text-white transition-all bg-surface-raised border border-border-color px-3 py-1.5 rounded-lg uppercase tracking-wider"
                   >
-                    <Copy className="w-4 h-4" />
-                    <span>{copied ? "Copied!" : "Copy Plan"}</span>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{copied ? "Copied!" : "Copy plan"}</span>
                   </button>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="relative pl-6 border-l-2 border-primary/30 space-y-6">
+                <div className="space-y-8">
+                  <div className="relative pl-6 border-l border-primary/20 space-y-8">
                     {(data.fix_plan.steps || []).map((step) => (
                       <div key={step.number} className="relative">
-                        <div className="absolute -left-[35px] w-8 h-8 rounded-full bg-surface border-2 border-primary flex items-center justify-center text-primary font-bold text-sm">
+                        <div className="absolute -left-[37px] w-8 h-8 rounded-full bg-surface border-2 border-primary shadow-glow flex items-center justify-center text-primary font-mono font-bold text-xs">
                           {step.number}
                         </div>
-                        <h4 className="text-md font-bold mb-2">{step.title}</h4>
-                        <p className="text-sm text-text-secondary mb-3">{step.description}</p>
+                        <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-2">[ STEP {step.number}: {step.title} ]</h4>
+                        <p className="text-xs text-text-secondary leading-relaxed font-medium mb-3.5">{step.description}</p>
                         {step.snippet && (
-                          <div className="bg-[#1E1E1E] rounded-md overflow-hidden border border-border-color">
-                            <div className="flex items-center px-4 py-2 bg-black/40 border-b border-border-color/50 text-xs text-text-secondary">
-                              {(step.files_modified || []).join(", ") || "Code Snippet"}
+                          <div className="bg-[#05050A] rounded-xl overflow-hidden border border-border-color">
+                            <div className="flex items-center px-4 py-2 bg-surface-raised border-b border-border-color/50 text-[10px] font-mono text-text-secondary uppercase">
+                              <Terminal className="w-3.5 h-3.5 mr-2 text-primary" />
+                              {(step.files_modified || []).join(", ") || "SOURCE CODE"}
                             </div>
-                            <pre className="p-4 text-xs font-mono text-[#D4D4D4] overflow-x-auto whitespace-pre-wrap">
+                            <pre className="p-4 text-xs font-mono text-secondary overflow-x-auto whitespace-pre-wrap leading-relaxed">
                               {step.snippet}
                             </pre>
                           </div>
@@ -276,11 +300,11 @@ export default function IssueHelper() {
                   </div>
 
                   {data.fix_plan.edge_cases && data.fix_plan.edge_cases.length > 0 && (
-                    <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start space-x-3">
+                    <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex items-start space-x-3 shadow-[0_0_15px_rgba(255,184,0,0.1)]">
                       <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
                       <div>
-                        <h5 className="text-sm font-bold text-warning mb-1">Edge Cases to Consider</h5>
-                        <ul className="text-sm text-text-secondary list-disc pl-4 space-y-1">
+                        <h5 className="text-xs font-bold text-warning uppercase tracking-wider mb-1.5">[ EDGE CASES WARNING ]</h5>
+                        <ul className="text-xs text-text-secondary list-disc pl-4 space-y-1 font-medium">
                           {data.fix_plan.edge_cases.map((ec, i) => (
                             <li key={i}>{ec}</li>
                           ))}
@@ -295,5 +319,17 @@ export default function IssueHelper() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function IssueHelper() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      </div>
+    }>
+      <IssueHelperContent />
+    </Suspense>
   );
 }

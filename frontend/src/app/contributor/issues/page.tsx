@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Clock, ArrowRight } from "lucide-react";
+import { Clock, ArrowRight, ShieldCheck } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { DifficultyBadge } from "@/components/ui/DifficultyBadge";
 
@@ -18,7 +18,7 @@ const ALL_ISSUES = [
     title: "Add warning when using useLayoutEffect on server",
     difficulty: "Beginner",
     estimatedHours: 1,
-    time: "~1 hour",
+    time: "1 hour",
     labels: ["good first issue", "warning", "ssr"],
     color: "success"
   },
@@ -29,7 +29,7 @@ const ALL_ISSUES = [
     title: "Fix hydration error mismatch on dynamic imports",
     difficulty: "Intermediate",
     estimatedHours: 2,
-    time: "~2 hours",
+    time: "2 hours",
     labels: ["bug", "react", "hydration"],
     color: "primary"
   },
@@ -40,7 +40,7 @@ const ALL_ISSUES = [
     title: "Support Pydantic v2 in WebSocket dependency injection",
     difficulty: "Advanced",
     estimatedHours: 5,
-    time: "~5 hours",
+    time: "5 hours",
     labels: ["enhancement", "pydantic", "websockets"],
     color: "secondary"
   },
@@ -51,7 +51,7 @@ const ALL_ISSUES = [
     title: "Implement fallback retry logic for Google Vertex AI embeddings",
     difficulty: "Intermediate",
     estimatedHours: 3,
-    time: "~3 hours",
+    time: "3 hours",
     labels: ["feature", "google-cloud", "retry"],
     color: "primary"
   },
@@ -62,7 +62,7 @@ const ALL_ISSUES = [
     title: "Update CLI documentation for v4 alpha",
     difficulty: "Beginner",
     estimatedHours: 1,
-    time: "~45 mins",
+    time: "45 mins",
     labels: ["docs", "cli"],
     color: "success"
   },
@@ -73,7 +73,7 @@ const ALL_ISSUES = [
     title: "Memory leak in Gemma2 model generation under high batch size",
     difficulty: "Advanced",
     estimatedHours: 8,
-    time: "~8 hours",
+    time: "8 hours",
     labels: ["bug", "memory", "gemma2"],
     color: "critical"
   }
@@ -98,25 +98,31 @@ export default function IssueFeed() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-heading font-bold mb-2">Good First Issues</h1>
-        <p className="text-text-secondary">
-          Curated example issues — use the Analyze button to get an AI-powered breakdown for any issue.
+    <div className="max-w-6xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col space-y-1">
+        <span className="text-xs font-bold tracking-[0.25em] text-accent uppercase block mb-1 text-glow-accent">
+          [ Quest Board: Active Missions ]
+        </span>
+        <h1 className="text-4xl font-heading font-extrabold text-white uppercase tracking-tight">
+          Good First Issues
+        </h1>
+        <p className="text-text-secondary text-sm">
+          Select a verified community quest to initialize an AI-powered walkthrough and dependency overview.
         </p>
       </div>
 
       {/* Filter pills */}
-      <div className="flex flex-wrap gap-3 mb-8">
+      <div className="flex flex-wrap gap-2.5 bg-surface/30 p-2.5 rounded-xl border border-primary/10">
         {ALL_FILTERS.map((filter) => (
           <button
             key={filter}
             id={`filter-${filter.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`}
             onClick={() => setActiveFilter(filter)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 border ${
               activeFilter === filter
-                ? "bg-primary text-white shadow-glow"
-                : "bg-surface-raised text-text-secondary border border-border-color hover:text-text-primary hover:border-primary/50"
+                ? "bg-accent text-white border-accent shadow-glow-accent"
+                : "bg-surface-raised/60 text-text-secondary border-border-color hover:text-text-primary hover:border-primary/50"
             }`}
           >
             {filter}
@@ -126,37 +132,41 @@ export default function IssueFeed() {
 
       {/* Issue grid */}
       {filteredIssues.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-text-secondary">
-          <p className="text-lg">No issues match the selected filter.</p>
+        <div className="flex flex-col items-center justify-center py-24 text-text-secondary border border-dashed border-border-color rounded-2xl bg-surface/10">
+          <p className="text-sm font-mono uppercase tracking-widest">[ NO ACTIVE MISSION FOUND ]</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredIssues.map((issue, idx) => (
             <motion.div
               key={issue.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
+              transition={{ delay: idx * 0.06 }}
               className="flex h-full"
             >
-              <GlassCard className="flex flex-col w-full h-full group" glowColor={issue.color as any}>
-                <div className="text-xs font-mono text-secondary mb-2">{issue.repo}</div>
+              <GlassCard className="flex flex-col w-full h-full relative overflow-hidden group border border-primary/10 hover:border-primary/30" glowColor={issue.color as any}>
+                <div className="absolute top-0 right-0 w-2.5 h-2.5 border-t border-r border-accent/30 pointer-events-none" />
+                
+                <div className="text-[10px] font-mono font-bold text-accent tracking-wider uppercase mb-2">
+                  // {issue.repo}
+                </div>
 
-                <h3 className="text-lg font-bold text-text-primary mb-4 line-clamp-2 leading-snug">
+                <h3 className="text-base font-extrabold text-white mb-4 line-clamp-2 leading-snug uppercase tracking-tight group-hover:text-glow-primary transition-all">
                   {issue.title}
                 </h3>
 
-                <div className="flex items-center space-x-4 mb-4">
+                <div className="flex items-center space-x-4 mb-5">
                   <DifficultyBadge level={issue.difficulty as any} />
-                  <div className="flex items-center text-xs text-text-secondary font-medium">
-                    <Clock className="w-3.5 h-3.5 mr-1" />
+                  <div className="flex items-center text-xs font-mono font-bold text-text-secondary uppercase">
+                    <Clock className="w-3.5 h-3.5 mr-1.5 text-primary" />
                     {issue.time}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-6 mt-auto">
+                <div className="flex flex-wrap gap-1.5 mb-6 mt-auto">
                   {issue.labels.map(label => (
-                    <span key={label} className="px-2 py-0.5 rounded text-xs border border-border-color bg-surface-raised text-text-secondary">
+                    <span key={label} className="px-2 py-1 rounded text-[10px] font-bold font-mono border border-primary/25 bg-primary/5 text-text-secondary uppercase">
                       {label}
                     </span>
                   ))}
@@ -166,9 +176,9 @@ export default function IssueFeed() {
                   href={`/contributor/issue-helper?repo=https://github.com/${issue.repo}&issue=https://github.com/${issue.repo}/issues/${issue.number}`}
                   className="w-full"
                 >
-                  <button className="w-full py-2.5 rounded-lg border border-border-color text-text-primary font-medium text-sm transition-all group-hover:bg-primary group-hover:border-primary group-hover:text-white group-hover:shadow-glow flex items-center justify-center">
-                    Analyze This Issue
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                  <button className="w-full py-3 rounded-lg border border-accent/20 bg-surface-raised text-accent font-extrabold text-xs uppercase tracking-widest transition-all duration-300 group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-accent group-hover:text-white group-hover:shadow-glow flex items-center justify-center">
+                    Accept Quest
+                    <ArrowRight className="w-4 h-4 ml-2 transition-transform duration-300 group-hover:translate-x-1" />
                   </button>
                 </Link>
               </GlassCard>
@@ -177,8 +187,12 @@ export default function IssueFeed() {
         </div>
       )}
 
-      <div className="mt-12 p-4 rounded-lg border border-border-color bg-surface-raised text-sm text-text-secondary text-center">
-        Real-time good first issue feed from GitHub search is planned for a future milestone (PRD §6.1 F-C-06).
+      {/* Info notice bar */}
+      <div className="p-4 rounded-xl border border-primary/20 bg-surface/30 text-xs font-mono font-semibold text-text-secondary flex items-center gap-3">
+        <ShieldCheck className="w-4 h-4 text-accent flex-shrink-0 animate-pulse" />
+        <span className="uppercase tracking-wider">
+          Real-time mission search synchronizer is scheduled for a future core update.
+        </span>
       </div>
     </div>
   );
