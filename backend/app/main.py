@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import contributor, review, admin, webhooks
+from app.api.endpoints import contributor, review, webhooks
 from app.core.config import settings
 import logging
 
@@ -27,7 +27,6 @@ app.add_middleware(
 # ─── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(contributor.router, prefix=f"{settings.API_V1_STR}/contributor", tags=["contributor"])
 app.include_router(review.router, prefix=f"{settings.API_V1_STR}/review", tags=["review"])
-app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(webhooks.router, prefix=f"{settings.API_V1_STR}/webhooks", tags=["webhooks"])
 
 

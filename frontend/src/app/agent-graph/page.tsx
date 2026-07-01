@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Network, Play, CheckCircle2, AlertTriangle,
-  Shield, Copy, Tag, Users, Activity, FileText
+  Network, Play, CheckCircle2, FileText
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 
@@ -15,25 +14,18 @@ interface NodeData {
   x: number;
   y: number;
   color: string;
-  type: "orchestrator" | "contributor" | "admin";
+  type: "orchestrator" | "contributor";
   description: string;
 }
 
 const nodes: NodeData[] = [
-  { id: "orch", label: "Orchestrator", icon: Network, x: 50, y: 50, color: "primary", type: "orchestrator", description: "LangGraph router — dispatches to sub-agents based on intent" },
+  { id: "orch", label: "Orchestrator", icon: Network, x: 50, y: 50, color: "primary", type: "orchestrator", description: "LangGraph router — dispatches to sub-agents based on contributor intent" },
 
-  { id: "repo", label: "Repo Agent", icon: Network, x: 20, y: 30, color: "success", type: "contributor", description: "Analyzes file tree and README to orient the contributor" },
-  { id: "issue", label: "Issue Agent", icon: FileText, x: 20, y: 50, color: "success", type: "contributor", description: "Fetches and simplifies GitHub issues; classifies difficulty" },
-  { id: "code", label: "Code Agent", icon: Network, x: 20, y: 70, color: "success", type: "contributor", description: "Nominates affected files and extracts call graph from real code" },
-  { id: "fix", label: "Fix Agent", icon: Play, x: 35, y: 85, color: "success", type: "contributor", description: "Generates step-by-step implementation plan from real file contents" },
-  { id: "review_c", label: "Review Agent", icon: CheckCircle2, x: 35, y: 15, color: "success", type: "contributor", description: "Reviews PR diffs and provides actionable feedback" },
-
-  { id: "triage", label: "Triage Agent", icon: AlertTriangle, x: 80, y: 30, color: "secondary", type: "admin", description: "Classifies priority and type of incoming issues (webhook)" },
-  { id: "dup", label: "Duplicate Agent", icon: Copy, x: 80, y: 50, color: "secondary", type: "admin", description: "Embeds issues in Chroma and detects semantic duplicates" },
-  { id: "label", label: "Label Agent", icon: Tag, x: 80, y: 70, color: "secondary", type: "admin", description: "Selects from real repo labels using few-shot examples" },
-  { id: "match", label: "Match Agent", icon: Users, x: 65, y: 85, color: "secondary", type: "admin", description: "Recommends contributors from real PR merge history" },
-  { id: "health", label: "Health Agent", icon: Activity, x: 65, y: 15, color: "secondary", type: "admin", description: "Fetches real GitHub metrics and generates AI health narrative" },
-  { id: "review_a", label: "Admin Review", icon: Shield, x: 95, y: 50, color: "secondary", type: "admin", description: "PR review in admin mode — includes CONTRIBUTING.md and contributor history" },
+  { id: "repo", label: "Repo Agent", icon: Network, x: 20, y: 25, color: "success", type: "contributor", description: "Analyzes file tree and README to orient the contributor in any codebase" },
+  { id: "issue", label: "Issue Agent", icon: FileText, x: 20, y: 45, color: "success", type: "contributor", description: "Fetches and simplifies GitHub issues; classifies difficulty and estimated hours" },
+  { id: "code", label: "Code Agent", icon: Network, x: 20, y: 65, color: "success", type: "contributor", description: "Nominates affected files and extracts call graph from real source code" },
+  { id: "fix", label: "Fix Agent", icon: Play, x: 35, y: 82, color: "success", type: "contributor", description: "Generates step-by-step implementation plan from real file contents" },
+  { id: "review", label: "Review Agent", icon: CheckCircle2, x: 35, y: 18, color: "success", type: "contributor", description: "Reviews PR diffs and provides actionable, categorized feedback before submission" },
 ];
 
 const getColorClass = (color: string, type: 'border' | 'bg' | 'text' | 'shadow') => {
@@ -65,15 +57,11 @@ export default function AgentGraphVisualizer() {
         </div>
 
         <div className="flex gap-4 pointer-events-auto items-center">
-          {/* Static diagram badge */}
           <span className="px-3 py-1 rounded-full text-xs border border-warning/40 bg-warning/10 text-warning font-medium">
             Static Architecture Diagram
           </span>
           <div className="flex items-center space-x-2 text-xs">
             <span className="w-3 h-3 rounded-full bg-success"></span> Contributor Agents
-          </div>
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="w-3 h-3 rounded-full bg-secondary"></span> Admin Agents
           </div>
         </div>
       </div>
@@ -87,7 +75,7 @@ export default function AgentGraphVisualizer() {
               <line
                 x1="50%" y1="50%"
                 x2={`${node.x}%`} y2={`${node.y}%`}
-                stroke={`rgba(${node.color === 'secondary' ? '0,212,255' : node.color === 'success' ? '0,229,160' : '110,86,207'}, 0.25)`}
+                stroke={`rgba(${node.color === 'success' ? '0,229,160' : '110,86,207'}, 0.25)`}
                 strokeWidth={activeNode === node.id ? 3 : 1.5}
               />
             </g>
