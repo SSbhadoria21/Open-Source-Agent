@@ -30,6 +30,11 @@ function IssueHelperContent() {
   const [copied, setCopied] = useState(false);
 
   const runAnalysis = async () => {
+    if (!repoUrl.trim() || !issueUrl.trim()) {
+      setError("Please provide both a Repository URL and an Issue URL.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setData(null);

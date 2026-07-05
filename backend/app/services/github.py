@@ -63,18 +63,39 @@ class GitHubService:
 
     def _parse_repo_name(self, repo_url: str) -> str:
         """Extract 'owner/repo' from a GitHub URL or bare 'owner/repo' string."""
+        if not repo_url:
+            raise ValueError("Repository URL cannot be empty")
         if "github.com" in repo_url:
             parts = repo_url.rstrip("/").split("/")
-            return f"{parts[-2]}/{parts[-1]}"
+            if len(parts) >= 2:
+                return f"{parts[-2]}/{parts[-1]}"
         return repo_url.strip("/")
 
     def _parse_issue_url(self, issue_url: str):
+        if not issue_url:
+            raise ValueError("Issue URL cannot be empty")
         parts = issue_url.rstrip("/").split("/")
-        return f"{parts[-4]}/{parts[-3]}", parts[-1]
+        if "issues" in parts:
+            try:
+                idx = parts.index("issues")
+                return f"{parts[idx-2]}/{parts[idx-1]}", parts[idx+1]
+            except (ValueError, IndexError):
+                pass
+        if len(parts) >= 4:
+            return f"{parts[-4]}/{parts[-3]}", parts[-1]
+        raise ValueError(f"Invalid Issue URL format: {issue_url}")
 
     def _parse_pr_url(self, pr_url: str):
+        if "/pull/" not in pr_url:
+            raise ValueError("Invalid Pull Request URL. It must be in the format: https://github.com/owner/repo/pull/123")
         parts = pr_url.rstrip("/").split("/")
-        return f"{parts[-4]}/{parts[-3]}", parts[-1]
+        try:
+            pull_index = parts.index("pull")
+            repo_name = f"{parts[pull_index-2]}/{parts[pull_index-1]}"
+            pr_number = parts[pull_index+1]
+            return repo_name, pr_number
+        except (ValueError, IndexError):
+            raise ValueError(f"Could not extract repo and PR number from: {pr_url}")
 
     # ─── Repo / file tree ─────────────────────────────────────────────────────
 

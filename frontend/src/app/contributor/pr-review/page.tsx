@@ -22,6 +22,12 @@ export default function PRReview() {
     setError(null);
     setData(null);
 
+    if (!prUrl.includes("/pull/")) {
+      setError("Invalid URL format. Please provide a full GitHub Pull Request URL (e.g., https://github.com/owner/repo/pull/123).");
+      setAnalyzing(false);
+      return;
+    }
+
     try {
       const result = await reviewPR(prUrl);
       setData(result);
