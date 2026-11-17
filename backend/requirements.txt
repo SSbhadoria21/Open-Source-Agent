@@ -9,6 +9,7 @@ chromadb
 redis
 sqlalchemy
 psycopg2-binary
+psycopg[binary]
 alembic
 PyGithub
 python-dotenv
