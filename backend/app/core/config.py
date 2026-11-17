@@ -62,6 +62,13 @@ class Settings(BaseSettings):
 
     # Chroma vector store
     CHROMA_PATH: str = ".chroma"
+    CHROMA_DIR: str = ".chroma_rag"
+
+    # RAG Settings
+    RAG_TOP_K: int = 5
+    RAG_MIN_SCORE: float = 0.5
+    RAG_MAX_CHUNKS: int = 200
+    RAG_CACHE_HOURS: int = 24
 
     # Webhook
     GITHUB_WEBHOOK_SECRET: str = ""
@@ -78,7 +85,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
-        env_file=".env",
+        env_file=(".env", "backend/.env"),
         extra="ignore"
     )
 

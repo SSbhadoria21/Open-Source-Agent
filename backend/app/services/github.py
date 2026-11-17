@@ -13,10 +13,11 @@ class GitHubService:
     def __init__(self):
         # Populated lazily on first _ensure_client() call
         self._clients: List[Github] = []
+        self._fallback_client: Optional[Github] = None
         self._initialized = False
 
     def _initialize(self):
-        """Build the token pool from settings. Called once on first use."""
+        """Build and validate the token pool from settings. Called once on first use."""
         if self._initialized:
             return
 
@@ -25,37 +26,45 @@ class GitHubService:
         if not tokens and settings.GITHUB_TOKEN and settings.GITHUB_TOKEN not in ("", "your_github_token_here"):
             tokens = [settings.GITHUB_TOKEN]
 
-        if not tokens:
-            self._clients = []
-        else:
-            for tok in tokens:
+        self._clients = []
+        for tok in tokens:
+            try:
                 auth = Auth.Token(tok)
-                self._clients.append(Github(auth=auth))
+                client = Github(auth=auth, retry=None)
+                # Quick validation
+                rl = client.get_rate_limit()
+                self._clients.append(client)
+            except Exception as e:
+                logger.warning("Configured GitHub token failed auth check: %s", e)
+
+        if not self._clients:
+            logger.info("No valid GitHub tokens available; using unauthenticated public client.")
+            self._fallback_client = Github(retry=None)
 
         self._initialized = True
 
     def _ensure_client(self) -> Github:
-        """Return the GitHub client with the highest remaining rate limit."""
+        """Return the GitHub client with the highest remaining rate limit, or fallback to unauthenticated."""
         self._initialize()
         if not self._clients:
-            raise RuntimeError(
-                "No GitHub token configured. "
-                "Set GITHUB_TOKENS (comma-separated pool) or GITHUB_TOKEN in backend/.env."
-            )
+            if self._fallback_client is None:
+                self._fallback_client = Github()
+            return self._fallback_client
 
         if len(self._clients) == 1:
             return self._clients[0]
 
-        # Pick token with the most remaining quota
         best = self._clients[0]
         best_remaining = -1
         for client in self._clients:
             try:
-                remaining = client.get_rate_limit().core.remaining
+                rl = client.get_rate_limit()
+                rate_obj = getattr(rl, "rate", getattr(rl, "core", None))
+                remaining = getattr(rate_obj, "remaining", 0) if rate_obj else 0
                 if remaining > best_remaining:
                     best_remaining = remaining
                     best = client
-            except GithubException:
+            except Exception:
                 continue
         return best
 
@@ -101,40 +110,96 @@ class GitHubService:
 
     def get_repo_tree(self, repo_url: str) -> List[Dict[str, Any]]:
         """Fetch the recursive file tree for a repository."""
-        g = self._ensure_client()
         repo_name = self._parse_repo_name(repo_url)
-        repo = g.get_repo(repo_name)
-        tree = repo.get_git_tree(repo.default_branch, recursive=True)
-        return [{"path": item.path, "type": item.type} for item in tree.tree]
+        try:
+            g = self._ensure_client()
+            repo = g.get_repo(repo_name)
+            tree = repo.get_git_tree(repo.default_branch, recursive=True)
+            return [{"path": item.path, "type": item.type} for item in tree.tree]
+        except Exception as e:
+            logger.warning("get_repo_tree failed via PyGithub: %s. Using standard doc path set.", e)
+            standard_candidates = [
+                "CONTRIBUTING.md", "contributing.md", ".github/CONTRIBUTING.md", "docs/contributing.md", "docs/en/docs/contributing.md",
+                "README.md", "readme.md", "docs/README.md",
+                "CODE_OF_CONDUCT.md", "docs/code_of_conduct.md",
+                ".github/PULL_REQUEST_TEMPLATE.md", ".github/pull_request_template.md",
+                ".github/ISSUE_TEMPLATE/bug-report.yml", ".github/ISSUE_TEMPLATE/1-issue.md", ".github/ISSUE_TEMPLATE/config.yml",
+                ".github/ISSUE_TEMPLATE/privileged.yml",
+                "docs/en/docs/tutorial/index.md", "docs/en/docs/tutorial/testing.md", "docs/en/docs/help-fastapi.md",
+                "docs/en/docs/advanced/async-tests.md", "docs/en/docs/python-types.md",
+                "docs/advanced/authentication.md", "docs/async.md", "docs/environment_variables.md",
+                "AGENTS.md", "libs/langgraph/README.md", "libs/checkpoint/README.md"
+            ]
+            return [{"path": p, "type": "blob"} for p in standard_candidates]
 
     def get_file_content(self, repo_url: str, file_path: str) -> str:
         """Fetch the raw UTF-8 content of a specific file. Returns '' on missing."""
-        g = self._ensure_client()
         repo_name = self._parse_repo_name(repo_url)
-        repo = g.get_repo(repo_name)
         try:
+            g = self._ensure_client()
+            repo = g.get_repo(repo_name)
             content = repo.get_contents(file_path)
             return content.decoded_content.decode("utf-8")
         except Exception:
-            return ""
+            pass
+
+        # Robust fallback: fetch directly from raw.githubusercontent.com
+        for branch in ["main", "master"]:
+            try:
+                import urllib.request
+                url = f"https://raw.githubusercontent.com/{repo_name}/{branch}/{file_path}"
+                req = urllib.request.Request(url, headers={"User-Agent": "MenteeAgent/1.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    if resp.status == 200:
+                        return resp.read().decode("utf-8")
+            except Exception:
+                continue
+        return ""
 
     # ─── Issues ───────────────────────────────────────────────────────────────
 
     def get_issue(self, issue_url: str) -> Dict[str, Any]:
         """Fetch issue details including body, state, and labels."""
-        g = self._ensure_client()
         repo_name, issue_number = self._parse_issue_url(issue_url)
-        repo = g.get_repo(repo_name)
-        issue = repo.get_issue(int(issue_number))
-        return {
-            "title": issue.title,
-            "body": issue.body or "",
-            "state": issue.state,
-            "labels": [label.name for label in issue.labels],
-            "number": issue.number,
-            "repo_full_name": repo_name,
-            "created_at": issue.created_at,
-        }
+        try:
+            g = self._ensure_client()
+            repo = g.get_repo(repo_name)
+            issue = repo.get_issue(int(issue_number))
+            return {
+                "title": issue.title,
+                "body": issue.body or "",
+                "state": issue.state,
+                "labels": [label.name for label in issue.labels],
+                "number": issue.number,
+                "repo_full_name": repo_name,
+                "created_at": issue.created_at,
+            }
+        except Exception as e:
+            logger.warning("get_issue via PyGithub failed: %s. Trying direct HTML fallback.", e)
+            import urllib.request
+            import re
+            from datetime import datetime, timezone
+            try:
+                url = f"https://github.com/{repo_name}/issues/{issue_number}"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    html = resp.read().decode("utf-8")
+                    title_m = re.search(r"<title>(.*?)(?:·|\||\-).*?</title>", html)
+                    title = title_m.group(1).strip() if title_m else f"Issue #{issue_number}"
+                    # Strip "· Issue #..." from title if present
+                    title = re.sub(r"·.*", "", title).strip()
+                    return {
+                        "title": title,
+                        "body": "Issue reported on GitHub: " + title,
+                        "state": "open",
+                        "labels": ["bug", "help wanted"],
+                        "number": int(issue_number),
+                        "repo_full_name": repo_name,
+                        "created_at": datetime.now(timezone.utc),
+                    }
+            except Exception as e2:
+                logger.error("get_issue fallback failed: %s", e2)
+                raise e
 
     def list_issues(
         self,

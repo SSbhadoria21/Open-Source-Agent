@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Network, Play, CheckCircle2, FileText, ArrowLeft, ShieldAlert
+  Network, Play, CheckCircle2, FileText, ArrowLeft, ShieldAlert, BookOpen
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import Link from "next/link";
@@ -24,7 +24,8 @@ const nodes: NodeData[] = [
   { id: "repo", label: "Repo Agent", icon: Network, x: 25, y: 25, color: "success", type: "contributor", description: "Blueprints Codebases — analyzes directory structures, files, and packages to orient developers." },
   { id: "issue", label: "Issue Agent", icon: FileText, x: 25, y: 55, color: "success", type: "contributor", description: "Parses Issues — retrieves active GitHub issues, details requirements in plain english, and estimates complexity." },
   { id: "code", label: "Code Agent", icon: Network, x: 25, y: 78, color: "success", type: "contributor", description: "Maps Flows — traces function definitions, code dependencies, and identifies exactly which files require edits." },
-  { id: "fix", label: "Fix Agent", icon: Play, x: 75, y: 75, color: "secondary", type: "contributor", description: "Executes Corrections — writes step-by-step implementation plans and suggested code snippets." },
+  { id: "rag", label: "Docs RAG Layer", icon: BookOpen, x: 50, y: 82, color: "accent", type: "contributor", description: "Knowledge Retrieval — chunks repo docs (CONTRIBUTING, README, templates), embeds via Gemini, and grounds plans with citations." },
+  { id: "fix", label: "Fix Agent", icon: Play, x: 75, y: 75, color: "secondary", type: "contributor", description: "Executes Corrections — writes step-by-step implementation plans grounded in repo docs and code snippets." },
   { id: "review", label: "Review Agent", icon: CheckCircle2, x: 75, y: 35, color: "secondary", type: "contributor", description: "Audits Branches — runs deep diagnostic validation on PRs for security, style, and bug checks before commits." },
 ];
 
@@ -32,6 +33,7 @@ const getColorClass = (color: string, type: 'border' | 'bg' | 'text' | 'shadow')
   if (color === 'primary') return type === 'border' ? 'border-primary' : type === 'bg' ? 'bg-primary' : type === 'text' ? 'text-primary' : 'shadow-[0_0_25px_rgba(110,86,207,0.7)]';
   if (color === 'secondary') return type === 'border' ? 'border-secondary' : type === 'bg' ? 'bg-secondary' : type === 'text' ? 'text-secondary' : 'shadow-[0_0_25px_rgba(0,212,255,0.7)]';
   if (color === 'success') return type === 'border' ? 'border-success' : type === 'bg' ? 'bg-success' : type === 'text' ? 'text-success' : 'shadow-[0_0_25px_rgba(0,229,160,0.7)]';
+  if (color === 'accent') return type === 'border' ? 'border-accent' : type === 'bg' ? 'bg-accent' : type === 'text' ? 'text-accent' : 'shadow-[0_0_25px_rgba(224,40,204,0.7)]';
   return '';
 };
 
@@ -77,7 +79,7 @@ export default function AgentGraphVisualizer() {
           </span>
           <div className="flex items-center space-x-2 text-[10px] font-mono font-bold text-text-secondary uppercase tracking-wider">
             <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse shadow-[0_0_8px_#00E5A0]"></span>
-            <span>6 Systems Online</span>
+            <span>7 Systems Online</span>
           </div>
         </div>
       </div>

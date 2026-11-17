@@ -10,6 +10,12 @@ backend/__pycache__/
 frontend/node_modules/
 .npm/
 
+# Chroma RAG
+.chroma/
+.chroma_rag/
+backend/.chroma/
+backend/.chroma_rag/
+
 # IDE
 .vscode/
 .idea/

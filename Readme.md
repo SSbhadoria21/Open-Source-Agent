@@ -95,7 +95,48 @@ flowchart LR
     ORCH -->|explain_issue| ISSUE[Issue Agent] --> R2([Response])
     ORCH -->|review_pr| REV[Review Agent] --> R3([Response])
     ORCH -->|trace_code| IA2[Issue Agent] --> CA[Code Agent] --> R4([Response])
-    ORCH -->|generate_fix| IA3[Issue Agent] --> CA2[Code Agent] --> FA[Fix Agent] --> R5([Response])
+    ORCH -->|generate_fix| IA3[Issue Agent] --> CA2[Code Agent] --> RAG[Docs RAG] --> FA[Fix Agent] --> R5([Response])
+```
+
+### 📚 RAG Architecture & Grounded Contribution Planning
+
+To prevent hallucinated conventions and ensure plans adhere strictly to the target repository's rules, a dedicated Retrieval-Augmented Generation (RAG) layer grounds the agent's output in the repository's own documentation:
+
+```mermaid
+flowchart LR
+    GH[GitHub Repo Docs\nCONTRIBUTING, README, docs] -->|Fetch| L[loader.py]
+    L -->|Headings + Size| C[chunker.py]
+    C -->|Gemini Embeddings\nRETRIEVAL_DOCUMENT| E[embedder.py]
+    E -->|Persist Per-Repo| S[(ChromaDB Store)]
+
+    Q[Issue + Goal Query] -->|RETRIEVAL_QUERY| R[retriever.py]
+    S -->|Top-K Context & Scores| R
+    R -->|Grounded Sources| FA[Fix Agent Planning]
+```
+
+1. **Loader (`backend/app/rag/loader.py`):** Fetches `CONTRIBUTING.md`, `README.md`, `CODE_OF_CONDUCT.md`, `docs/` files, issue/PR templates, and merged PR examples using the existing GitHub client.
+2. **Chunker (`backend/app/rag/chunker.py`):** Splits markdown by heading structure first, then by ~800 character windows with 100 character overlap, preserving metadata (`file_path`, `heading`, `source_url`).
+3. **Embedder (`backend/app/rag/embedder.py`):** Batches embeddings using the `google-genai` SDK with `task_type="RETRIEVAL_DOCUMENT"` for indexing and `task_type="RETRIEVAL_QUERY"` for queries.
+4. **Vector Store (`backend/app/rag/store.py`):** Manages local persistent ChromaDB collections named `repo_{owner}_{name}` with automatic 24-hour freshness caching.
+5. **Retriever & Grounded Fix Agent (`backend/app/rag/retriever.py` & `fix_agent.py`):** Pulls top-k relevant chunks above a similarity threshold, prompts the LLM to cite sources as `[file_path]` and report `"not found in repo docs"` when appropriate, and attaches a clickable `sources` list to the final plan.
+
+#### Running RAG Evaluation & Hit-Rate Tests
+
+```bash
+# Verify real Gemini embedding vector dimension and cosine similarity margin
+python scripts/check_embedding.py
+
+# Run all unit tests including RAG chunker, store, retriever, and fallback tests
+pytest backend/tests/ -v
+
+# Run real retrieval benchmark across live target repositories (20 verified questions)
+python scripts/eval_rag.py
+
+# Run offline benchmark smoke test (CI only)
+python scripts/eval_rag.py --offline
+
+# Run end-to-end SSE stream verification with live Gemini LLM + 24h cache hit timing
+python scripts/test_e2e_stream.py
 ```
 
 ---
@@ -162,22 +203,35 @@ Open **http://localhost:3000** → Click **Start Contributing**.
 ```
 Open-Source-Agent/
 ├── backend/
-│   └── app/
-│       ├── agents/              # All AI agents
-│       │   ├── orchestrator.py  # LangGraph state machine & router
-│       │   ├── repo_agent.py    # Repo orientation
-│       │   ├── issue_agent.py   # Issue simplification
-│       │   ├── code_agent.py    # File & flow discovery
-│       │   ├── fix_agent.py     # Implementation planning
-│       │   └── review_agent.py  # PR review
-│       ├── api/                 # REST route handlers
-│       ├── core/                # Config & utilities
-│       ├── models/              # SQLAlchemy ORM
-│       └── main.py              # FastAPI entry point
+│   ├── app/
+│   │   ├── agents/              # All AI agents
+│   │   │   ├── orchestrator.py  # LangGraph state machine & router
+│   │   │   ├── repo_agent.py    # Repo orientation
+│   │   │   ├── issue_agent.py   # Issue simplification
+│   │   │   ├── code_agent.py    # File & flow discovery
+│   │   │   ├── fix_agent.py     # Grounded implementation planning
+│   │   │   └── review_agent.py  # PR review
+│   │   ├── api/                 # REST & SSE route handlers
+│   │   ├── core/                # Config & settings
+│   │   ├── models/              # SQLAlchemy ORM
+│   │   ├── rag/                 # Canonical RAG pipeline module
+│   │   │   ├── loader.py        # GitHub doc & PR loader
+│   │   │   ├── chunker.py       # Heading-aware markdown chunker
+│   │   │   ├── embedder.py      # Gemini embedding batcher
+│   │   │   ├── store.py         # ChromaDB per-repo collections
+│   │   │   └── retriever.py     # Top-k filtered retriever
+│   │   └── main.py              # FastAPI entry point
+│   └── tests/                   # Pytest suite
+│       ├── test_rag.py          # RAG unit tests
+│       └── test_rag_fallbacks.py# RAG fallback tests
 ├── frontend/src/app/
 │   ├── onboarding/              # GitHub username entry
 │   ├── dashboard/               # Gamified contributor profile
 │   └── contributor/             # Workspace (orientation, issues, PR review)
+├── scripts/
+│   ├── check_embedding.py       # Embedding verification & similarity test
+│   ├── eval_rag.py              # RAG hit-rate & MRR evaluation benchmark
+│   └── test_e2e_stream.py       # End-to-end SSE stream & cache timing test
 ├── docker-compose.yml
 ├── PRD_Open_Source_Mentee_Agent.md
 └── TRD_Open_Source_Mentee_Agent.md

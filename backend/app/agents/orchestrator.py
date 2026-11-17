@@ -1,5 +1,8 @@
+import logging
 from typing import TypedDict, Any, Dict, List, Optional
 from langgraph.graph import StateGraph, END, START
+
+logger = logging.getLogger(__name__)
 
 
 class AgentState(TypedDict, total=False):
@@ -14,6 +17,7 @@ class AgentState(TypedDict, total=False):
     affected_files: List[Dict[str, Any]]
     call_graph: Dict[str, Any]
     file_contents: Dict[str, str]     # real file content fetched by code_agent → passed to fix_agent
+    retrieved_context: List[Dict[str, Any]]  # RAG retrieved documentation chunks with citations
     fix_plan: Dict[str, Any]
     pr_review: Dict[str, Any]
     triage_result: Dict[str, Any]
@@ -80,12 +84,52 @@ def code_agent_node(state: AgentState) -> AgentState:
     return state
 
 
+def retrieve_repo_context_node(state: AgentState) -> AgentState:
+    """Retrieve repository documentation chunks for grounding contribution plan."""
+    try:
+        from app.rag.retriever import retrieve
+        repo_url = state["payload"].get("repo_url", "")
+        issue_summary = state.get("issue_summary", {})
+
+        query_parts = []
+        if issue_summary.get("title"):
+            query_parts.append(issue_summary["title"])
+        if issue_summary.get("plain_summary"):
+            query_parts.append(issue_summary["plain_summary"])
+        if issue_summary.get("affected_areas"):
+            areas = issue_summary["affected_areas"]
+            if isinstance(areas, list):
+                query_parts.append(f"Areas: {', '.join(areas)}")
+            else:
+                query_parts.append(f"Areas: {areas}")
+
+        skill_level = state["payload"].get("skill_level") or state.get("user_role") or "contributor"
+        goal = state["payload"].get("goal") or "contribute setup testing pull request guidelines"
+        query_parts.append(f"Skill: {skill_level} Goal: {goal}")
+
+        query_str = " | ".join(query_parts)
+        retrieved = retrieve(query=query_str, repo=repo_url)
+        state["retrieved_context"] = retrieved
+        logger.info("retrieve_repo_context_node: retrieved %d chunks for %s", len(retrieved), repo_url)
+    except Exception as e:
+        logger.warning("retrieve_repo_context_node error: %s (falling back to empty context)", e)
+        state["retrieved_context"] = []
+    return state
+
+
 def fix_agent_node(state: AgentState) -> AgentState:
     issue_summary = state.get("issue_summary", {})
     affected_files = state.get("affected_files", [])
     call_graph = state.get("call_graph", {})
     file_contents = state.get("file_contents", {})   # real content from code_agent
-    state["fix_plan"] = generate_fix(issue_summary, affected_files, call_graph, file_contents)
+    retrieved_context = state.get("retrieved_context", [])
+    state["fix_plan"] = generate_fix(
+        issue_summary,
+        affected_files,
+        call_graph,
+        file_contents,
+        retrieved_context=retrieved_context,
+    )
     return state
 
 
@@ -145,7 +189,7 @@ def after_issue_agent(state: AgentState) -> str:
 def after_code_agent(state: AgentState) -> str:
     intent = state.get("intent")
     if intent == "generate_fix":
-        return "fix_agent"
+        return "retrieve_repo_context"
     return END
 
 
@@ -157,6 +201,7 @@ def build_orchestrator_graph():
     workflow.add_node("repo_agent", repo_agent_node)
     workflow.add_node("issue_agent", issue_agent_node)
     workflow.add_node("code_agent", code_agent_node)
+    workflow.add_node("retrieve_repo_context", retrieve_repo_context_node)
     workflow.add_node("fix_agent", fix_agent_node)
     workflow.add_node("review_agent", review_agent_node)
     workflow.add_node("triage_agent", triage_agent_node)
@@ -193,9 +238,11 @@ def build_orchestrator_graph():
     })
 
     workflow.add_conditional_edges("code_agent", after_code_agent, {
-        "fix_agent": "fix_agent",
+        "retrieve_repo_context": "retrieve_repo_context",
         END: END,
     })
+
+    workflow.add_edge("retrieve_repo_context", "fix_agent")
 
     return workflow.compile()
 

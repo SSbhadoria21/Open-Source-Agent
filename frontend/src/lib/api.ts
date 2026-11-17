@@ -84,9 +84,25 @@ export interface FixStep {
   files_modified: string[];
 }
 
+export interface SourceCitation {
+  file_path: string;
+  source_url: string;
+  heading?: string;
+  score?: number;
+}
+
+export interface RetrievedChunk {
+  text: string;
+  file_path: string;
+  heading: string;
+  source_url: string;
+  score: number;
+}
+
 export interface FixPlanData {
   steps: FixStep[];
   edge_cases: string[];
+  sources?: SourceCitation[];
 }
 
 export interface FixPlanResponse {
@@ -95,6 +111,7 @@ export interface FixPlanResponse {
   affected_files: AffectedFile[];
   call_graph: Record<string, any>;
   fix_plan: FixPlanData;
+  retrieved_context?: RetrievedChunk[];
 }
 
 export async function getFixPlan(issueUrl: string, repoUrl: string): Promise<FixPlanResponse> {
@@ -102,6 +119,54 @@ export async function getFixPlan(issueUrl: string, repoUrl: string): Promise<Fix
     method: "POST",
     body: JSON.stringify({ issue_url: issueUrl, repo_url: repoUrl }),
   });
+}
+
+/**
+ * Connect to the Server-Sent Events stream for real-time agent execution and RAG progress.
+ */
+export function streamFixPlan(
+  issueUrl: string,
+  repoUrl: string,
+  onEvent: (eventType: string, data: any) => void,
+  onError: (error: any) => void
+): () => void {
+  const url = `${API_BASE}/contributor/fix-plan-stream?repo_url=${encodeURIComponent(
+    repoUrl
+  )}&issue_url=${encodeURIComponent(issueUrl)}`;
+
+  const eventSource = new EventSource(url);
+
+  const eventTypes = [
+    "pipeline_start",
+    "agent_status",
+    "indexing_docs",
+    "retrieved_context",
+    "complete",
+    "error",
+  ];
+
+  eventTypes.forEach((type) => {
+    eventSource.addEventListener(type, (e: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(e.data);
+        onEvent(type, parsed);
+        if (type === "complete" || type === "error") {
+          eventSource.close();
+        }
+      } catch (err) {
+        onEvent(type, e.data);
+      }
+    });
+  });
+
+  eventSource.onerror = (err) => {
+    eventSource.close();
+    onError(err);
+  };
+
+  return () => {
+    eventSource.close();
+  };
 }
 
 // ─── Review Endpoint ─────────────────────────────────────────────────────────
@@ -135,4 +200,3 @@ export async function reviewPR(prUrl: string): Promise<ReviewPRResponse> {
     body: JSON.stringify({ pr_url: prUrl }),
   });
 }
-
